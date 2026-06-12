@@ -1,0 +1,11 @@
+{{/* Machine identity, collected once on `chezmoi init` and stored in ~/.config/chezmoi/chezmoi.toml */}}
+{{/* prompt key is "profile" so headless init can pass: --promptChoice profile=server */}}
+{{- $profile := promptChoiceOnce . "profile" "profile" (list "personal-mac" "work-mac" "server") -}}
+
+[data]
+    profile = {{ $profile | quote }}
+    # Machines share by default; per-machine differences branch on .profile in templates.
+
+[git]
+    autoCommit = false
+    autoPush = false

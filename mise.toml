@@ -1,0 +1,17 @@
+# Dev tooling for working on THIS repo (not the machines' global tool set —
+# that lives in home/dot_config/mise/config.toml.tmpl, managed by chezmoi).
+
+[tools]
+go = "1.26"
+
+[tasks.build]
+run = "go build -o bin/myplace ./cmd/myplace"
+description = "Build the myplace binary into bin/"
+
+[tasks.test]
+run = "go test ./..."
+description = "Run all tests"
+
+[tasks.vet]
+run = "go vet ./..."
+description = "Static analysis"

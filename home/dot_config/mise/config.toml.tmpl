@@ -1,0 +1,14 @@
+# Global tool set for every myplace-managed machine.
+# Managed by chezmoi from the myplace repo — edit there, not here.
+
+[tools]
+# Shared baseline: keep this list small and universal.
+jq = "latest"
+ripgrep = "latest"
+{{ if ne .profile "server" -}}
+# Workstation-only tools (personal-mac, work-mac)
+node = "lts"
+{{- end }}
+
+[settings]
+experimental = false
