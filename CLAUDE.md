@@ -33,6 +33,15 @@ When a decision changes, don't edit history: supersede the old ADR with a new on
 
 The TUI's job is orchestration and visibility on top of these tools, not duplication of them. Prefer invoking their CLIs and parsing their output (both support `--format json` style output for most commands) over re-implementing behavior.
 
+## Settled design points
+
+Decided but not all spec'd yet — write the feature/workflow doc before building on one of these:
+
+- **Stack: Go + Charm libraries** (Bubble Tea, Bubbles, Lip Gloss, Huh) — see ADR-0002 and `docs/guides/charm-tui-stack.md`. Core logic lives in TUI-free packages; the TUI is a skin.
+- **Headless `--json` from day one**: every capability works as a plain CLI command with `--json` output. Phase 2's server reporting builds on this, so never weld logic to the TUI layer.
+- **Machine profiles share by default**: personal Macs, work Mac, and servers are profiles over one common setup; per-machine differences are the exception, handled via chezmoi templates/data.
+- **Status is bidirectional**: "in sync" means no drift in *either* direction — local changes not pushed to the dotfiles repo, and repo/tool updates not yet applied locally both count as out of sync.
+
 ## Project state
 
-Design/documentation phase. The TUI language and framework are not yet chosen — that decision belongs in an ADR before any code is written.
+Design/documentation phase. Stack is chosen (ADR-0002); no code yet.
