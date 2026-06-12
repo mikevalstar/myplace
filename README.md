@@ -2,20 +2,74 @@
 
 A TUI for getting machines from zero to fully-configured, and keeping them that way.
 
-`myplace` wraps [chezmoi](https://www.chezmoi.io/) (dotfiles) and [mise-en-place](https://mise.jdx.dev/) (tools, runtimes, tasks) in a single terminal UI that handles:
+`myplace` wraps [chezmoi](https://www.chezmoi.io/) (dotfiles) and [mise-en-place](https://mise.jdx.dev/) (tools, runtimes, tasks) in a single terminal UI — plus a headless `--json` mode so the same commands work in scripts, cron, and SSH loops:
 
 - **Bootstrap** — bring a brand-new machine (Mac or server) up to a known-good state
-- **Update** — pull dotfile changes, upgrade tools, re-apply configuration
-- **Status** — see at a glance whether a machine is in sync, what's drifted, and what's pending
+- **Update** — pull dotfile changes, upgrade tools, capture and push local tweaks
+- **Status** — see what's drifted, in either direction, on screen or as JSON
 
 Target machines: personal Macs, a work Mac, and assorted Linux servers — one common setup, many hosts.
+
+> 🚧 **Design phase.** The commands below are the spec ([docs/](docs/README.md) is the source of truth); the binary doesn't exist yet. This README is kept current as the design and code evolve.
+
+## Install
+
+One static binary, no dependencies — works on a stock Mac or a bare server image:
+
+```sh
+curl -fsSL https://example.com/myplace/install.sh | sh   # URL TBD — lands in ~/.local/bin
+```
+
+## Boot a new machine
+
+On a fresh machine, after the install one-liner:
+
+```sh
+myplace
+```
+
+With no existing setup detected, this opens the **bootstrap wizard**: it installs chezmoi and mise if missing, asks for your dotfiles repo and this machine's profile (`personal-mac` / `work-mac` / `server`), applies your dotfiles, installs your tools, and finishes with a status screen.
+
+For servers, skip the wizard entirely:
+
+```sh
+myplace bootstrap --repo git@github.com:you/dotfiles.git --profile server --yes
+```
+
+Details and failure handling: [bootstrap workflow](docs/workflows/bootstrap-new-machine.md).
+
+## Everyday use
+
+```sh
+myplace          # TUI dashboard: drift in both directions, drill into diffs, run updates
+myplace update   # review-and-apply flow: pull dotfiles, capture local edits, upgrade tools
+myplace status   # quick plain-text summary, no TUI
+```
+
+"In sync" is bidirectional: repo changes you haven't applied **and** local edits you haven't pushed both count as drift. Updating always shows you the diff before touching anything.
+
+## Scripting and JSON
+
+Every data-producing command takes `--json`: stdout is exactly one JSON document (logs go to stderr), and exit codes tell you the verdict without parsing — `0` in sync, `1` drifted, `2` unknown (e.g. offline), `3` error.
+
+```sh
+# Check one server
+ssh web1 myplace status --json | jq .verdict
+
+# Sweep the fleet
+for h in web1 web2 db1; do
+  ssh "$h" myplace status --json >/dev/null && echo "$h: ok" || echo "$h: drifted"
+done
+```
+
+Contract details (schema versioning, non-interactive rules): [headless CLI spec](docs/features/headless-cli-and-json-output.md).
 
 ## Roadmap
 
 | Phase | Scope |
 |-------|-------|
-| 1 | Local TUI: bootstrap, update, and status for the current machine via chezmoi + mise |
-| 2 | Fleet awareness: machines ping a central server so you can track status of every system from one place |
+| 1 | Local TUI + headless CLI: bootstrap, update, and status for the current machine via chezmoi + mise |
+| 2 | Fleet awareness: machines report status (the same JSON) to a central server so every system is visible in one place |
 
 ## Documentation
 
@@ -23,9 +77,7 @@ This is a **documentation-first** project. Design decisions, feature specs, and 
 
 - [docs/adrs](docs/adrs/) — architecture decision records
 - [docs/features](docs/features/) — feature specs
-- [docs/workflows](docs/workflows/) — user-facing workflows the TUI supports
+- [docs/workflows](docs/workflows/) — end-to-end flows the TUI supports
 - [docs/guides](docs/guides/) — developer guides for this repo and the libraries it uses
 
-## Status
-
-🚧 Early — currently in the design/documentation phase. No code yet.
+Built with Go and the [Charm](https://charm.sh) libraries ([ADR-0002](docs/adrs/0002-go-and-charm-for-the-tui.md)).

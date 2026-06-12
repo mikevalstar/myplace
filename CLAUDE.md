@@ -25,6 +25,7 @@ When a decision changes, don't edit history: supersede the old ADR with a new on
 - Other docs use kebab-case descriptive names: `bootstrap-new-machine.md`
 - Doc `status` values: `draft` → `accepted`/`active` → `superseded`/`deprecated`
 - Dates in frontmatter are ISO format: `2026-06-12`
+- **The README is part of the spec**: its install/usage sections must be updated in the same change whenever the command surface, flags, or install story changes. Docs explain design; the README shows a user how to run it.
 
 ## Key external tools
 
