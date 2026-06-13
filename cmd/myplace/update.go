@@ -161,6 +161,15 @@ func localModified(ctx context.Context, ch *chezmoi.Client) []string {
 	return mods
 }
 
+func contains(xs []string, want string) bool {
+	for _, x := range xs {
+		if x == want {
+			return true
+		}
+	}
+	return false
+}
+
 // captureOutgoing walks locally-modified managed files and lets the user
 // keep & share (re-add), discard (apply --force), or skip each one, then
 // offers to commit and push whatever the source repo has pending.
@@ -199,6 +208,16 @@ func captureOutgoing(ctx context.Context, ch *chezmoi.Client) error {
 		case "share":
 			if err := ch.ReAdd(ctx, target); err != nil {
 				return fmt.Errorf("re-add %s: %w", f.Path, err)
+			}
+			// chezmoi re-add silently no-ops on a templated source file: the
+			// edit isn't reverse-rendered into the template, so the file stays
+			// modified. Detect that and point the user at the real fix instead
+			// of pretending the change was captured.
+			if contains(localModified(ctx, ch), f.Path) {
+				fmt.Fprintf(os.Stderr,
+					"  ! %s is templated — re-add can't capture it. Edit the source directly: `chezmoi edit %s`, then commit in the source repo.\n",
+					f.Path, target)
+				logger.Error("re-add did not capture templated file", "file", f.Path)
 			}
 		case "discard":
 			if err := ch.ApplyForce(ctx, target); err != nil {
