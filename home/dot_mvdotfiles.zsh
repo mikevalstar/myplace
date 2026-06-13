@@ -108,11 +108,13 @@ alias bj="bjourn"
 # options :  --no-filesize --no-time --no-permissions --no-user --color=always --icons=always
 export EZA_CONFIG_DIR="$HOME/.config/eza"
 if [[ "${MYPLACE_INTERACTIVE_SHELL:-1}" == 1 ]]; then
-    alias ls="eza --icons=auto --git"
-    alias ll="eza --long --icons=auto --git"
-    alias la="eza --long --all --icons=auto --git"
-    alias lt="eza --tree --level=2 --icons=auto"
-    alias lss="eza --long"
+    # --group-directories-first everywhere; --git-repos (repo status on dirs)
+    # only shows in long views. Colours come from theme.yml below.
+    alias ls="eza --icons=auto --git --group-directories-first"
+    alias ll="eza --long --icons=auto --git --git-repos --group-directories-first"
+    alias la="eza --long --all --icons=auto --git --git-repos --group-directories-first"
+    alias lt="eza --tree --level=2 --icons=auto --group-directories-first"
+    alias lss="eza --long --git-repos --group-directories-first"
 fi
 
 ## Some ENV things
