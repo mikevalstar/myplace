@@ -1,0 +1,13 @@
+# Managed by myplace (chezmoi). Atuin (installed via mise) ships sensible
+# defaults, so only the settings that differ from stock live here. Full
+# reference: https://docs.atuin.sh/configuration/config/
+#
+# atuin keeps shell history in its own synced DB; the up-key/ctrl-r init lives
+# in ~/.mvdotfiles.zsh (interactive-only). This file is just behaviour tweaks.
+
+# Enter runs the selected command immediately; Tab puts it on the line to edit.
+enter_accept = true
+
+[sync]
+# Use sync v2 (record-based) so multi-machine history stays consistent.
+records = true

@@ -1,0 +1,15 @@
+# Managed by myplace (chezmoi). bat's config file is a list of command-line
+# arguments, one per line. bat is installed via mise on every machine.
+# Docs: https://github.com/sharkdp/bat#configuration-file
+
+# Theme. This is a bat built-in (see `bat --list-themes`). Catppuccin is not a
+# built-in — it needs theme files dropped in bat's config dir plus a
+# `bat cache --build`, which can't run during provisioning (bat installs after
+# the provision script). Left as a follow-up; TwoDark suits the dark setup.
+--theme="TwoDark"
+
+# Line numbers, git-modification markers, and a filename header — no heavy grid.
+--style="numbers,changes,header"
+
+# Page only when writing to a terminal, so piped/agent output stays plain.
+--paging=auto

@@ -5,3 +5,20 @@
 [user]
 	name = {{ dig "gitName" "Mike Valstar" . }}
 	email = {{ dig "gitEmail" "mike@valstar.dev" . }}
+
+# delta — syntax-highlighting pager for git diffs. delta is in the mise tool
+# baseline, so it's on every machine (servers included). git only pages to an
+# interactive TTY, so agent/CI `git diff` output stays plain and unpolluted.
+# https://dandavison.github.io/delta/
+[core]
+	pager = delta
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true        # n / N jump between diff sections
+	line-numbers = true
+	syntax-theme = TwoDark  # match the bat config theme
+[merge]
+	conflictstyle = diff3  # show the base alongside both sides (delta renders it well)
+[diff]
+	colorMoved = default   # distinguish moved lines from added/removed
