@@ -1,0 +1,30 @@
+# --- appearance ---
+theme = Catppuccin Mocha
+background-opacity = 0.9
+background-blur = 15
+window-padding-x = 10
+window-padding-y = 10
+macos-titlebar-style = transparent
+window-save-state = always
+
+# --- font ---
+font-family = "FiraCode Nerd Font Mono"
+font-size = 14
+
+# --- input / macOS ---
+macos-option-as-alt = true
+mouse-hide-while-typing = true
+# 'clipboard' copies selections to the system clipboard (cmd+v). Plain 'true'
+# uses the selection buffer, which on macOS only middle-click pastes from.
+copy-on-select = clipboard
+
+# --- shell integration (ssh-* installs Ghostty's terminfo/env on the servers) ---
+shell-integration-features = cursor,title,ssh-env,ssh-terminfo
+
+# --- keybinds ---
+# toggle the dropdown "quick terminal" from anywhere — works even when Ghostty isn't focused
+keybind = global:cmd+`=toggle_quick_terminal
+# reload this config in place, no restart needed
+keybind = cmd+shift+,=reload_config
+# send a newline instead of submitting — multiline input in Claude Code / REPLs
+keybind = shift+enter=text:\n
