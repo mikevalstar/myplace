@@ -80,6 +80,38 @@ func New(command string) (*log.Logger, func()) {
 	return tagged, func() { _ = f.Close() }
 }
 
+// RecentLines returns up to the last n lines of the log file (for the TUI
+// Activity pane). It reads only a tail window of the file, so it's cheap to
+// call on a timer. Returns nil if the log can't be read.
+func RecentLines(n int) []string {
+	f, err := os.Open(Path())
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	const window = 32 << 10
+	var start int64
+	if fi, err := f.Stat(); err == nil && fi.Size() > window {
+		start = fi.Size() - window
+	}
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
+		return nil
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil
+	}
+	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	if start > 0 && len(lines) > 0 {
+		lines = lines[1:] // drop the partial first line from mid-file seek
+	}
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return lines
+}
+
 // Tail trims s to the last stderrTailKB bytes for logging, so a chatty
 // subprocess can't bloat a single log line.
 func Tail(s string) string {
