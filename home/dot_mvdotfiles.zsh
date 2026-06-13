@@ -127,3 +127,9 @@ fi
 
 ## Some ENV things
 export EDITOR="nvim"
+
+## Claude Code
+# Reduce TUI repaint flicker. Exported (not just set) so the claude child
+# process inherits it. Captured from a local ~/.zshrc edit and brought under
+# management so it applies on every machine.
+export CLAUDE_CODE_NO_FLICKER=1
