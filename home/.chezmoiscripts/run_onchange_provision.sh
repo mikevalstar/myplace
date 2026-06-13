@@ -10,6 +10,32 @@ set -u
 
 log() { printf 'myplace provision: %s\n' "$1" >&2; }
 
+# --- git (prerequisite for chezmoi and the clones below; not a mise tool) ---
+# chezmoi's built-in git can clone the source repo on a machine with no system
+# git, so this can run first and install real git before it's needed below.
+if ! command -v git >/dev/null 2>&1; then
+	if [ "$(uname -s)" = "Darwin" ]; then
+		log "git not found — install the Command Line Tools: xcode-select --install"
+	else
+		sudo=""
+		[ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && sudo="sudo"
+		log "installing git"
+		if command -v apt-get >/dev/null 2>&1; then
+			$sudo apt-get update -qq && $sudo apt-get install -y git || log "git install failed"
+		elif command -v dnf >/dev/null 2>&1; then
+			$sudo dnf install -y git || log "git install failed"
+		elif command -v yum >/dev/null 2>&1; then
+			$sudo yum install -y git || log "git install failed"
+		elif command -v pacman >/dev/null 2>&1; then
+			$sudo pacman -S --noconfirm git || log "git install failed"
+		elif command -v apk >/dev/null 2>&1; then
+			$sudo apk add git || log "git install failed"
+		else
+			log "no known package manager; install git manually"
+		fi
+	fi
+fi
+
 # --- oh-my-zsh (keep our chezmoi-managed .zshrc) ---
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
 	if command -v zsh >/dev/null 2>&1; then

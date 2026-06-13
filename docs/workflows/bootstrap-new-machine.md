@@ -20,7 +20,7 @@ Take a brand-new Mac or Linux server from "nothing installed" to fully configure
 - The dotfiles repo exists and is reachable (see failure modes for the SSH-key chicken-and-egg).
 - `myplace` itself installed via the installer one-liner: `curl -fsSL <install-url> | sh` (static binary into `~/.local/bin`, no dependencies — this is why ADR-0002 requires a static binary).
 
-Git is *not* a hard precondition: chezmoi bundles a built-in git (`--use-builtin-git on`) sufficient for cloning; real git arrives later via mise/system packages.
+Git is *not* a hard precondition: chezmoi bundles a built-in git sufficient for cloning the source repo; the provision script then installs real git (via the OS package manager on Linux; Xcode CLT on macOS) before anything else needs it. See [ADR-0007](../adrs/0007-provisioning-mechanism.md).
 
 ## Steps
 

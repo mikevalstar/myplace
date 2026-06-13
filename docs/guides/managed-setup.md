@@ -18,8 +18,9 @@ Where things live and how to add a new tool, dotfile, or provisioning step so it
 | Path | What it is |
 |------|------------|
 | `dot_config/mise/config.toml.tmpl` | The mise tool set — every machine's CLI tools/runtimes from mise's registry |
-| `.chezmoiscripts/run_onchange_provision.sh` | Idempotent installer for oh-my-zsh + plugins, rustup, fnm (things mise can't own) |
+| `.chezmoiscripts/run_onchange_provision.sh` | Idempotent installer for git, oh-my-zsh + plugins, rustup, fnm (things mise can't own) |
 | `dot_zshrc` | The managed `~/.zshrc` — oh-my-zsh setup, mise activation, tool env wiring |
+| `dot_gitconfig` | Git identity (`~/.gitconfig`) — name/email |
 | `dot_mvdotfiles.zsh` | Personal shell config (`~/.mvdotfiles.zsh`) sourced by `.zshrc`: tool inits, aliases, functions |
 | `.chezmoi.toml.tmpl` | Machine identity (prompts for `profile` on init) |
 
