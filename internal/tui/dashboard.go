@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -18,6 +19,7 @@ import (
 	"github.com/mikevalstar/myplace/internal/drift"
 	"github.com/mikevalstar/myplace/internal/logging"
 	"github.com/mikevalstar/myplace/internal/mise"
+	"github.com/mikevalstar/myplace/internal/outdated"
 )
 
 // Minimum terminal size below which we render a plain stacked fallback rather
@@ -45,27 +47,42 @@ var (
 )
 
 type reportMsg struct{ report drift.Report }
+type inventoryMsg struct{ inv outdated.Inventory }
 type updateDoneMsg struct{ errs []string }
 type activityTickMsg struct{}
+
+// mode is which screen the dashboard is showing.
+type mode int
+
+const (
+	modeDashboard mode = iota // the paneled home screen
+	modeOutdated              // the scrollable outdated-packages detail view
+)
 
 type Model struct {
 	ch      *chezmoi.Client
 	ms      *mise.Client
+	sources []outdated.Source
 	version string
 
 	spinner    spinner.Model
 	report     *drift.Report
+	inventory  *outdated.Inventory
 	loading    bool
+	invLoading bool
 	updating   bool
 	updateErrs []string
 	activity   []string
 	width      int
 	height     int
+
+	mode mode
+	vp   viewport.Model // scrollable body for modeOutdated
 }
 
-func New(ch *chezmoi.Client, ms *mise.Client, version string) Model {
+func New(ch *chezmoi.Client, ms *mise.Client, sources []outdated.Source, version string) Model {
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
-	return Model{ch: ch, ms: ms, version: version, spinner: sp, loading: true}
+	return Model{ch: ch, ms: ms, sources: sources, version: version, spinner: sp, loading: true, invLoading: true}
 }
 
 func (m Model) loadCmd() tea.Cmd {
@@ -73,6 +90,16 @@ func (m Model) loadCmd() tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 		return reportMsg{drift.Compute(ctx, m.ch, m.ms, m.version)}
+	}
+}
+
+// loadInventoryCmd gathers the cross-manager outdated inventory independently
+// of the drift report, so the dashboard isn't blocked waiting on it.
+func (m Model) loadInventoryCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		return inventoryMsg{outdated.Collect(ctx, m.sources...)}
 	}
 }
 
@@ -108,13 +135,16 @@ func activityTick() tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spinner.Tick, m.loadCmd(), activityTick())
+	return tea.Batch(m.spinner.Tick, m.loadCmd(), m.loadInventoryCmd(), activityTick())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		if m.mode == modeOutdated {
+			m.vp.Width, m.vp.Height = m.width, m.height-3
+		}
 		return m, nil
 	case activityTickMsg:
 		m.activity = logging.RecentLines(200)
@@ -123,20 +153,47 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.report = &msg.report
 		m.loading = false
 		return m, nil
+	case inventoryMsg:
+		m.inventory = &msg.inv
+		m.invLoading = false
+		if m.mode == modeOutdated {
+			m.vp.SetContent(m.outdatedContent())
+		}
+		return m, nil
 	case updateDoneMsg:
 		m.updating = false
 		m.updateErrs = msg.errs
 		m.loading = true
 		return m, tea.Batch(m.spinner.Tick, m.loadCmd())
 	case tea.KeyMsg:
+		// In the outdated detail view, keys drive the scroll/return; the
+		// dashboard's r/u/o are inactive there.
+		if m.mode == modeOutdated {
+			switch msg.String() {
+			case "esc", "q":
+				m.mode = modeDashboard
+				return m, nil
+			case "ctrl+c":
+				return m, tea.Quit
+			}
+			var cmd tea.Cmd
+			m.vp, cmd = m.vp.Update(msg)
+			return m, cmd
+		}
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "o":
+			m.mode = modeOutdated
+			m.vp = viewport.New(m.width, m.height-3)
+			m.vp.SetContent(m.outdatedContent())
+			return m, nil
 		case "r":
 			if !m.loading && !m.updating {
 				m.loading = true
+				m.invLoading = true
 				m.updateErrs = nil
-				return m, tea.Batch(m.spinner.Tick, m.loadCmd())
+				return m, tea.Batch(m.spinner.Tick, m.loadCmd(), m.loadInventoryCmd())
 			}
 		case "u":
 			if !m.loading && !m.updating {
@@ -241,6 +298,65 @@ func (m Model) toolsLines() []string {
 	return out
 }
 
+// updatesLines is the dashboard's "Updates available" pane: per-source outdated
+// counts from the (informational) inventory, with a hint to open the detail
+// view. It is independent of the verdict — separate from drift (ADR-0010).
+func (m Model) updatesLines() []string {
+	if m.invLoading || m.inventory == nil {
+		return []string{subtleStyle.Render("checking…")}
+	}
+	var out []string
+	for _, s := range m.inventory.Sources {
+		switch {
+		case !s.Available:
+			out = append(out, subtleStyle.Render(fmt.Sprintf("%s: n/a", s.Name)))
+		case s.Error != "":
+			out = append(out, errStyle.Render(fmt.Sprintf("%s: error", s.Name)))
+		default:
+			line := fmt.Sprintf("%s: %d", s.Name, len(s.Packages))
+			if len(s.Packages) > 0 {
+				line = delStyle.Render(line)
+			}
+			out = append(out, line)
+		}
+	}
+	out = append(out, "", helpStyle.Render("press o for details"))
+	return out
+}
+
+// outdatedContent is the scrollable body of the modeOutdated view: every
+// outdated package grouped by source. The viewport clips vertically but not
+// horizontally, so each line is truncated to the viewport width to keep long
+// names/versions inside the frame.
+func (m Model) outdatedContent() string {
+	if m.invLoading || m.inventory == nil {
+		return subtleStyle.Render("checking…")
+	}
+	cw := m.vp.Width
+	if cw <= 0 {
+		cw = m.width
+	}
+	var b strings.Builder
+	line := func(s string) { b.WriteString(truncate(s, cw) + "\n") }
+	for _, s := range m.inventory.Sources {
+		line(paneTitle.Render(s.Name))
+		switch {
+		case !s.Available:
+			line(subtleStyle.Render("  not available"))
+		case s.Error != "":
+			line(errStyle.Render("  ! " + s.Error))
+		case len(s.Packages) == 0:
+			line(subtleStyle.Render("  up to date"))
+		default:
+			for _, p := range s.Packages {
+				line(delStyle.Render(fmt.Sprintf("  %s  %s → %s", p.Name, p.Current, p.Latest)))
+			}
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
 // activityLines puts notices (update available, errors) first, then the log tail.
 func (m Model) activityLines(max int) []string {
 	var out []string
@@ -284,7 +400,7 @@ func (m Model) header(width int) string {
 }
 
 func (m Model) footer(width int) string {
-	left := helpStyle.Render("r refresh • u update • q quit")
+	left := helpStyle.Render("r refresh • u update • o outdated • q quit")
 	var right string
 	if r := m.report; r != nil && r.Myplace.Latest != nil && *r.Myplace.Latest != r.Myplace.Current {
 		right = noticeStyle.Render(fmt.Sprintf("update available: %s ↑", *r.Myplace.Latest))
@@ -300,6 +416,10 @@ func (m Model) View() string {
 	w, h := m.width, m.height
 	if w == 0 || h == 0 {
 		return "  starting…"
+	}
+
+	if m.mode == modeOutdated {
+		return m.outdatedView()
 	}
 
 	if m.loading || m.updating || m.report == nil {
@@ -323,12 +443,12 @@ func (m Model) View() string {
 		topH = 5
 	}
 	botH := bodyH - topH
-	leftW := w / 2
-	rightW := w - leftW
+	colW := w / 3
 
 	top := lipgloss.JoinHorizontal(lipgloss.Top,
-		box("Dotfiles", m.dotfilesLines(), leftW, topH),
-		box("Tools (mise)", m.toolsLines(), rightW, topH),
+		box("Dotfiles", m.dotfilesLines(), colW, topH),
+		box("Tools (mise)", m.toolsLines(), colW, topH),
+		box("Updates available", m.updatesLines(), w-2*colW, topH),
 	)
 	activity := box("Activity", m.activityLines(botH-2), w, botH)
 
@@ -358,8 +478,18 @@ func (m Model) smallView() string {
 	return b.String()
 }
 
+// outdatedView is the full-screen scrollable detail of all outdated packages
+// (entered with `o`). Its header is self-contained so it renders even before
+// the drift report has loaded.
+func (m Model) outdatedView() string {
+	title := headerStyle.Render("myplace "+m.version) + subtleStyle.Render("  outdated packages")
+	header := truncate(title, m.width) + "\n" + ruleStyle.Render(strings.Repeat("─", m.width))
+	footer := helpStyle.Render("↑/↓ scroll • esc/q back • ctrl+c quit")
+	return strings.Join([]string{header, m.vp.View(), footer}, "\n")
+}
+
 // Run starts the dashboard.
-func Run(ch *chezmoi.Client, ms *mise.Client, version string) error {
-	_, err := tea.NewProgram(New(ch, ms, version), tea.WithAltScreen()).Run()
+func Run(ch *chezmoi.Client, ms *mise.Client, sources []outdated.Source, version string) error {
+	_, err := tea.NewProgram(New(ch, ms, sources, version), tea.WithAltScreen()).Run()
 	return err
 }

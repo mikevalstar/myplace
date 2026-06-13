@@ -32,6 +32,7 @@ const (
 const (
 	exitCodesDrift    = "0=in sync;1=drifted;2=unknown (e.g. offline);3=error"
 	exitCodesConverge = "0=success;1=completed with per-item failures;3=error, or a needed decision was not supplied non-interactively"
+	exitCodesOutdated = "0=all current;1=outdated packages available;3=error (no source could be queried)"
 
 	// The canonical, tool-wide table (the union across commands) advertised at
 	// the top of the manifest and brief; matches the headless CLI spec.

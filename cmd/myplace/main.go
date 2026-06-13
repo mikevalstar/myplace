@@ -9,10 +9,12 @@ import (
 	charmlog "github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
+	"github.com/mikevalstar/myplace/internal/brew"
 	"github.com/mikevalstar/myplace/internal/chezmoi"
 	"github.com/mikevalstar/myplace/internal/drift"
 	"github.com/mikevalstar/myplace/internal/logging"
 	"github.com/mikevalstar/myplace/internal/mise"
+	"github.com/mikevalstar/myplace/internal/outdated"
 	"github.com/mikevalstar/myplace/internal/run"
 	"github.com/mikevalstar/myplace/internal/tui"
 	"github.com/mikevalstar/myplace/internal/version"
@@ -41,7 +43,7 @@ func main() {
 	ch := chezmoi.New(r)
 	ms := mise.New(r)
 
-	root := newRootCmd(ch, ms)
+	root := newRootCmd(r, ch, ms)
 
 	if err := root.Execute(); err != nil {
 		logger.Error("exit with error", "err", err.Error())
@@ -55,7 +57,15 @@ func main() {
 // help command (which also powers `help --json` and `help --llm`), and the
 // per-command annotations the manifest reads back (see help.go). Shared by
 // main and the help tests so the tree under test is exactly the real one.
-func newRootCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
+func newRootCmd(r run.Runner, ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
+	// Package-manager sources for `outdated` and the dashboard's Updates pane.
+	// Slice order is display order. The brew source self-reports Available()
+	// == false when brew isn't on PATH, so listing it is safe everywhere
+	// (brew-if-present, ADR-0008/0009/0010).
+	sources := []outdated.Source{
+		outdated.MiseSource(ms),
+		outdated.BrewSource(brew.New(r)),
+	}
 	root := &cobra.Command{
 		Use:   "myplace",
 		Short: "Bootstrap, update, and check machines managed by chezmoi + mise",
@@ -93,7 +103,7 @@ func newRootCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 				fmt.Print(renderStatusText(rep))
 				os.Exit(drift.ExitCode(rep.Verdict))
 			}
-			return tui.Run(ch, ms, version.Version)
+			return tui.Run(ch, ms, sources, version.Version)
 		},
 	}
 
@@ -104,6 +114,7 @@ func newRootCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 	root.SetHelpCommand(newHelpCmd())
 	root.AddCommand(
 		newStatusCmd(ch, ms),
+		newOutdatedCmd(sources...),
 		newUpdateCmd(ch, ms),
 		newBootstrapCmd(ch, ms),
 		newVersionCmd(),

@@ -2,7 +2,7 @@
 title: Headless CLI with JSON output
 status: accepted
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-13
 tags: [cli, json, headless, automation]
 phase: 1
 ---
@@ -41,6 +41,7 @@ The same person is both audiences: at a Mac, you want the TUI; across twelve ser
 | `myplace` | TUI dashboard; routes to bootstrap wizard on a fresh machine | — |
 | `myplace bootstrap` | guided wizard (huh form) | `--repo <url> --profile <name> --yes` |
 | `myplace status` | human-readable summary (plain text, no TUI) | `--json` |
+| `myplace outdated` | per-source list of upgradable packages (plain text) | `--json` — informational; own exit codes (see below) |
 | `myplace update` | TUI review-and-apply flow | `--yes [--dotfiles] [--tools]`, plus `--json` for the result report |
 | `myplace self-update` | confirm prompt | `--yes`, `--json` |
 | `myplace version` | plain text | `--json` |
@@ -61,14 +62,16 @@ If a headless invocation reaches a point that would require a prompt (a conflict
 
 ### Exit codes
 
-| Code | `status` | `update` / `bootstrap` |
-|------|----------|------------------------|
-| 0 | in sync | success (or nothing to do) |
-| 1 | drifted | completed with per-item failures (e.g. one tool failed) |
-| 2 | unknown (some checks couldn't run, e.g. offline) | — |
-| 3 | error (couldn't produce a report) | error / would-need-prompt in headless mode |
+| Code | `status` | `update` / `bootstrap` | `outdated` |
+|------|----------|------------------------|------------|
+| 0 | in sync | success (or nothing to do) | all current |
+| 1 | drifted | completed with per-item failures (e.g. one tool failed) | updates available |
+| 2 | unknown (some checks couldn't run, e.g. offline) | — | — |
+| 3 | error (couldn't produce a report) | error / would-need-prompt in headless mode | error (no source could be queried) |
 
 So `ssh host myplace status --json` gives the verdict in `$?` before you even parse the body.
+
+`outdated` is **informational** and has its own contract (above): unmanaged/brew packages being behind never affects the `status` drift verdict — `0`/`1`/`3` there mean "is anything upgradable?", not "is the managed setup in sync?". See [Outdated packages](outdated-packages.md) and [ADR-0010](../adrs/0010-cross-package-manager-outdated-inventory.md).
 
 ### Canonical example
 
@@ -110,4 +113,5 @@ Full field semantics live in the [status workflow](../workflows/check-machine-st
 
 - [ADR-0002](../adrs/0002-go-and-charm-for-the-tui.md) — the core/TUI separation that makes this free
 - [Check machine status](../workflows/check-machine-status.md) — semantics of the status report
+- [Outdated packages](outdated-packages.md) — the `outdated` command, its envelope and distinct exit codes
 - [Update a machine](../workflows/update-machine.md), [Bootstrap a new machine](../workflows/bootstrap-new-machine.md)

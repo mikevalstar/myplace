@@ -22,7 +22,7 @@ import (
 func testRoot(t *testing.T) *cobra.Command {
 	t.Helper()
 	r := run.WithLogger(nil, nil)
-	root := newRootCmd(chezmoi.New(r), mise.New(r))
+	root := newRootCmd(r, chezmoi.New(r), mise.New(r))
 	root.InitDefaultHelpCmd()
 	return root
 }
