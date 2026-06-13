@@ -60,6 +60,3 @@ export BUN_INSTALL="$HOME/.bun"
 
 # claude with permissions skipped (danger zone)
 alias kennyloggins="claude --dangerously-skip-permissions"
-
-# CLAUDE settings
-CLAUDE_CODE_NO_FLICKER=1
