@@ -16,8 +16,15 @@ import (
 	"github.com/mikevalstar/myplace/internal/version"
 )
 
-// This repo IS the dotfiles + mise config repo (ADR-0003).
-const defaultRepo = "https://github.com/mikevalstar/myplace.git"
+// This repo IS the dotfiles + mise config repo (ADR-0003). These defaults are
+// this setup's owner; bootstrap always passes them to chezmoi init via
+// --promptString (promptStringOnce has no non-interactive fallback — it would
+// error without a value), so a headless bootstrap never blocks.
+const (
+	defaultRepo     = "https://github.com/mikevalstar/myplace.git"
+	defaultGitName  = "Mike Valstar"
+	defaultGitEmail = "mike@valstar.dev"
+)
 
 var profiles = []string{"personal-mac", "work-mac", "server"}
 
@@ -60,6 +67,14 @@ func runBootstrap(cmd *cobra.Command, ch *chezmoi.Client, ms *mise.Client, opts 
 	if opts.repo == "" {
 		opts.repo = defaultRepo
 	}
+	// Default the git identity so it's always supplied to chezmoi init (and
+	// pre-filled in the wizard, where it can be edited — e.g. a work email).
+	if opts.gitName == "" {
+		opts.gitName = defaultGitName
+	}
+	if opts.gitEmail == "" {
+		opts.gitEmail = defaultGitEmail
+	}
 	if opts.yes {
 		if opts.profile == "" {
 			fmt.Fprintln(os.Stderr, "--yes requires --profile (personal-mac, work-mac, or server)")
@@ -75,8 +90,8 @@ func runBootstrap(cmd *cobra.Command, ch *chezmoi.Client, ms *mise.Client, opts 
 			huh.NewInput().Title("Dotfiles repo").Value(&opts.repo),
 			huh.NewSelect[string]().Title("Machine profile").
 				Options(huh.NewOptions(profiles...)...).Value(&opts.profile),
-			huh.NewInput().Title("Git name").Description("blank = repo default").Value(&opts.gitName),
-			huh.NewInput().Title("Git email").Description("blank = repo default; set a work email here on the work mac").Value(&opts.gitEmail),
+			huh.NewInput().Title("Git name").Description("used for git commits").Value(&opts.gitName),
+			huh.NewInput().Title("Git email").Description("used for git commits; change for a work email on the work mac").Value(&opts.gitEmail),
 			huh.NewConfirm().Title("Install chezmoi + mise (if missing), apply dotfiles, install tools?").
 				Value(&confirm),
 		))

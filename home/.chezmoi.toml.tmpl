@@ -1,9 +1,11 @@
 {{/* Machine identity, collected once on `chezmoi init` and stored in ~/.config/chezmoi/chezmoi.toml */}}
 {{/* Headless/agent init can pre-answer the prompts, e.g.:
      --promptChoice profile=server --promptString gitEmail=you@work.com */}}
+{{/* prompt strings match the data keys so `--promptString gitEmail=…` resolves
+     (chezmoi matches --promptString by prompt text, not by the data key). */}}
 {{- $profile := promptChoiceOnce . "profile" "profile" (list "personal-mac" "work-mac" "server") -}}
-{{- $gitName := promptStringOnce . "gitName" "Git name" "Mike Valstar" -}}
-{{- $gitEmail := promptStringOnce . "gitEmail" "Git email" "mike@valstar.dev" -}}
+{{- $gitName := promptStringOnce . "gitName" "gitName" "Mike Valstar" -}}
+{{- $gitEmail := promptStringOnce . "gitEmail" "gitEmail" "mike@valstar.dev" -}}
 
 [data]
     profile = {{ $profile | quote }}
