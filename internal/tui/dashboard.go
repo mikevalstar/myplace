@@ -196,6 +196,9 @@ func (m Model) View() string {
 	}
 
 	var errs string
+	if r.Myplace.Latest != nil && *r.Myplace.Latest != r.Myplace.Current {
+		errs += subtleStyle.Render(fmt.Sprintf("  myplace %s → %s available (myplace self-update)", r.Myplace.Current, *r.Myplace.Latest)) + "\n"
+	}
 	for _, e := range append(append([]string{}, r.Errors...), m.updateErrs...) {
 		errs += errStyle.Render("  ! "+e) + "\n"
 	}

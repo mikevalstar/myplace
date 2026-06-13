@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -47,11 +50,20 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 				var ok bool
 				err := huh.NewConfirm().
 					Title("Update this machine?").
-					Description("chezmoi update (pull + apply), then mise install + upgrade").
+					Description("capture local edits, chezmoi update (pull + apply), then mise install + upgrade").
 					Value(&ok).Run()
 				if err != nil || !ok {
 					fmt.Fprintln(os.Stderr, "aborted")
 					os.Exit(3)
+				}
+				// Outgoing capture runs BEFORE pull+apply so local edits are
+				// committed instead of clobbered (see update workflow doc).
+				// Interactive only: cron must never auto-push unreviewed edits.
+				if !toolsOnly {
+					if err := captureOutgoing(ctx, ch); err != nil {
+						fmt.Fprintln(os.Stderr, "capture aborted:", err)
+						os.Exit(3)
+					}
 				}
 			}
 
@@ -104,4 +116,78 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 	cmd.Flags().BoolVar(&dotfilesOnly, "dotfiles", false, "only update dotfiles")
 	cmd.Flags().BoolVar(&toolsOnly, "tools", false, "only update tools")
 	return cmd
+}
+
+// captureOutgoing walks locally-modified managed files and lets the user
+// keep & share (re-add), discard (apply --force), or skip each one, then
+// offers to commit and push whatever the source repo has pending.
+func captureOutgoing(ctx context.Context, ch *chezmoi.Client) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	files, err := ch.Status(ctx)
+	if err != nil {
+		return fmt.Errorf("chezmoi status: %w", err)
+	}
+
+	for _, f := range files {
+		if !f.LocalChanged {
+			continue
+		}
+		target := filepath.Join(home, f.Path)
+		if diff, err := ch.Diff(ctx, target); err == nil && strings.TrimSpace(diff) != "" {
+			fmt.Fprintf(os.Stderr, "\n── %s (applying would make this change, i.e. undo your local edit) ──\n%s\n", f.Path, diff)
+		} else {
+			fmt.Fprintf(os.Stderr, "\n── %s (modified locally) ──\n", f.Path)
+		}
+		var choice string
+		err := huh.NewSelect[string]().
+			Title(f.Path).
+			Options(
+				huh.NewOption("keep & share — machine wins, update the repo", "share"),
+				huh.NewOption("discard — repo wins, overwrite my local edit", "discard"),
+				huh.NewOption("skip — decide later", "skip"),
+			).Value(&choice).Run()
+		if err != nil {
+			return err
+		}
+		switch choice {
+		case "share":
+			if err := ch.ReAdd(ctx, target); err != nil {
+				return fmt.Errorf("re-add %s: %w", f.Path, err)
+			}
+		case "discard":
+			if err := ch.ApplyForce(ctx, target); err != nil {
+				return fmt.Errorf("apply %s: %w", f.Path, err)
+			}
+		}
+	}
+
+	n, err := ch.Uncommitted(ctx)
+	if err != nil || n == 0 {
+		return nil
+	}
+	var share bool
+	if err := huh.NewConfirm().
+		Title(fmt.Sprintf("Source repo has %d uncommitted change(s) — commit and push?", n)).
+		Value(&share).Run(); err != nil {
+		return err
+	}
+	if !share {
+		return nil
+	}
+	host, _ := os.Hostname()
+	msg := "captured changes from " + host
+	if err := huh.NewInput().Title("Commit message").Value(&msg).Run(); err != nil {
+		return err
+	}
+	if err := ch.CommitAll(ctx, msg); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	if err := ch.Push(ctx); err != nil {
+		// Not fatal: the commit is safe locally; status shows it as unpushed.
+		fmt.Fprintln(os.Stderr, "push failed (commit kept locally):", err)
+	}
+	return nil
 }

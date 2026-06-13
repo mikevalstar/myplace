@@ -136,6 +136,41 @@ func (c *Client) Update(ctx context.Context) error {
 	return err
 }
 
+// Diff shows what `chezmoi apply` would change for one target (absolute path).
+// For a locally-modified file this is the change that would UNDO the local edit.
+func (c *Client) Diff(ctx context.Context, target string) (string, error) {
+	out, err := c.r.Run(ctx, "", "chezmoi", "diff", target)
+	return string(out), err
+}
+
+// ReAdd captures the local state of a target back into the source repo
+// (machine wins).
+func (c *Client) ReAdd(ctx context.Context, target string) error {
+	_, err := c.r.Run(ctx, "", "chezmoi", "re-add", target)
+	return err
+}
+
+// ApplyForce overwrites a target with the source state (repo wins).
+func (c *Client) ApplyForce(ctx context.Context, target string) error {
+	_, err := c.r.Run(ctx, "", "chezmoi", "apply", "--force", target)
+	return err
+}
+
+// CommitAll stages and commits everything in the source repo.
+func (c *Client) CommitAll(ctx context.Context, message string) error {
+	if _, err := c.r.Run(ctx, "", "chezmoi", "git", "--", "add", "-A"); err != nil {
+		return err
+	}
+	_, err := c.r.Run(ctx, "", "chezmoi", "git", "--", "commit", "-m", message)
+	return err
+}
+
+// Push pushes the source repo to its upstream.
+func (c *Client) Push(ctx context.Context) error {
+	_, err := c.r.Run(ctx, "", "chezmoi", "git", "--", "push")
+	return err
+}
+
 // InitApply runs first-time setup: clone the repo, answer the profile
 // prompt non-interactively, and apply.
 func (c *Client) InitApply(ctx context.Context, repo, profile string) error {

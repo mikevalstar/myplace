@@ -1,0 +1,25 @@
+# Release pipeline — see ADR-0004. Archive names are version-less on purpose:
+# install.sh and `myplace self-update` depend on the stable
+# releases/latest/download/myplace_<os>_<arch>.tar.gz URL.
+version: 2
+project_name: myplace
+
+builds:
+  - main: ./cmd/myplace
+    binary: myplace
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/mikevalstar/myplace/internal/version.Version={{ .Version }}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github-native

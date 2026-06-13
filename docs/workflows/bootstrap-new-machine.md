@@ -1,6 +1,6 @@
 ---
 title: Bootstrap a new machine
-status: draft
+status: active
 created: 2026-06-12
 updated: 2026-06-12
 tags: [bootstrap, chezmoi, mise, wizard]

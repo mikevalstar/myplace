@@ -53,4 +53,4 @@ This repo is simultaneously the app, the chezmoi source repo, and the mise confi
 
 ## Project state
 
-v0 implemented and verified end-to-end: `bootstrap` (wizard + headless), `status` (TUI dashboard + `--json`, spec'd exit codes), `update` (converge-only: incoming dotfiles + tools). Not yet built: outgoing-drift capture (re-add/commit/push), per-file diff review, `self-update`, installer script, release pipeline.
+v0 implemented and verified end-to-end: `bootstrap` (wizard + headless), `status` (TUI dashboard + `--json`, spec'd exit codes, includes outdated-binary check), `update` (interactive: per-file capture of local edits then converge; headless: converge-only), `self-update` (GitHub releases). Releases: tag `v*` → goreleaser via Actions (ADR-0004); `install.sh` at repo root is the installer. Not yet built: per-file diff review before apply, `push: false` profile policy, phase-2 server.

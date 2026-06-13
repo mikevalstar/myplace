@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/mikevalstar/myplace/internal/drift"
+	"github.com/mikevalstar/myplace/internal/release"
 	"github.com/mikevalstar/myplace/internal/version"
 )
 
@@ -28,12 +30,31 @@ func newVersionCmd() *cobra.Command {
 }
 
 func newSelfUpdateCmd() *cobra.Command {
-	return &cobra.Command{
+	var jsonOut bool
+	cmd := &cobra.Command{
 		Use:   "self-update",
-		Short: "Update the myplace binary (not implemented yet)",
+		Short: "Replace this binary with the latest GitHub release",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Fprintln(os.Stderr, "self-update is not implemented yet — re-run the installer one-liner from the README")
-			os.Exit(3)
+			tag, err := release.SelfUpdate(cmd.Context(), version.Version)
+			switch {
+			case errors.Is(err, release.ErrUpToDate):
+				if jsonOut {
+					emitJSON(map[string]any{"schema": drift.Schema, "version": version.Version, "updated": false})
+				} else {
+					fmt.Fprintf(os.Stderr, "already up to date (%s)\n", version.Version)
+				}
+			case err != nil:
+				fmt.Fprintln(os.Stderr, "self-update:", err)
+				os.Exit(3)
+			default:
+				if jsonOut {
+					emitJSON(map[string]any{"schema": drift.Schema, "version": release.NormalizeTag(tag), "updated": true})
+				} else {
+					fmt.Fprintf(os.Stderr, "updated %s → %s\n", version.Version, release.NormalizeTag(tag))
+				}
+			}
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit JSON on stdout")
+	return cmd
 }

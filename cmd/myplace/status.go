@@ -78,6 +78,9 @@ func renderStatusText(r drift.Report) string {
 	for _, o := range r.Tools.Outdated {
 		fmt.Fprintf(&b, "    %s %s → %s\n", o.Name, o.Current, o.Wanted)
 	}
+	if r.Myplace.Latest != nil && *r.Myplace.Latest != r.Myplace.Current {
+		fmt.Fprintf(&b, "  myplace:  %s → %s available (myplace self-update)\n", r.Myplace.Current, *r.Myplace.Latest)
+	}
 	for _, e := range r.Errors {
 		fmt.Fprintf(&b, "  ! %s\n", e)
 	}

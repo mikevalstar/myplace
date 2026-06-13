@@ -11,6 +11,7 @@ import (
 
 	"github.com/mikevalstar/myplace/internal/chezmoi"
 	"github.com/mikevalstar/myplace/internal/mise"
+	"github.com/mikevalstar/myplace/internal/release"
 )
 
 const (
@@ -77,7 +78,7 @@ func ExitCode(verdict string) int {
 
 // Decide picks the overall verdict. Known drift wins over unknown checks:
 // if we can already see drift, partial blindness doesn't change the answer.
-func Decide(d Dotfiles, t Tools, hadUnknown, hadFatal bool) string {
+func Decide(d Dotfiles, t Tools, m Myplace, hadUnknown, hadFatal bool) string {
 	if hadFatal {
 		return VerdictError
 	}
@@ -85,7 +86,8 @@ func Decide(d Dotfiles, t Tools, hadUnknown, hadFatal bool) string {
 		(d.BehindOrigin != nil && *d.BehindOrigin > 0) ||
 		(d.UncommittedFiles != nil && *d.UncommittedFiles > 0) ||
 		(d.UnpushedCommits != nil && *d.UnpushedCommits > 0) ||
-		len(t.Missing) > 0 || len(t.Outdated) > 0
+		len(t.Missing) > 0 || len(t.Outdated) > 0 ||
+		(m.Latest != nil && *m.Latest != m.Current)
 	if drifted {
 		return VerdictDrifted
 	}
@@ -181,7 +183,15 @@ func Compute(ctx context.Context, ch *chezmoi.Client, ms *mise.Client, myplaceVe
 		}
 	}
 
-	// Latest-release lookup is phase-2-adjacent; null = not checked.
-	r.Verdict = Decide(r.Dotfiles, r.Tools, hadUnknown, hadFatal)
+	// Best-effort latest-release lookup; null (not unknown) when offline,
+	// per the status workflow.
+	relCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if tag, err := release.LatestTag(relCtx); err == nil {
+		latest := release.NormalizeTag(tag)
+		r.Myplace.Latest = &latest
+	}
+
+	r.Verdict = Decide(r.Dotfiles, r.Tools, r.Myplace, hadUnknown, hadFatal)
 	return r
 }

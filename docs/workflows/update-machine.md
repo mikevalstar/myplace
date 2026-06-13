@@ -1,6 +1,6 @@
 ---
 title: Update a machine
-status: draft
+status: active
 created: 2026-06-12
 updated: 2026-06-12
 tags: [update, drift, chezmoi, mise]
@@ -21,15 +21,15 @@ Resolve the drift found by [status](check-machine-status.md), in both directions
 
 ## Steps
 
-The update screen presents drift grouped into the four buckets below; the user can run them all ("update everything") or drill into each. Order matters — incoming dotfiles first, because they may change the mise config that step 3 reads.
+The update screen presents drift grouped into the four buckets below; the user can run them all ("update everything") or drill into each. Order matters — **capture outgoing edits before applying anything**, because `chezmoi apply` overwrites locally-modified managed files; capturing first turns a silent clobber into an ordinary git merge that step 2 surfaces properly.
 
-1. **Pull incoming dotfiles.** `chezmoi git -- pull --rebase` (rebase keeps any local source-dir commits on top), then show `chezmoi diff` in a viewport. On confirm: `chezmoi apply`. Per-file skip is available — skipping records nothing; the file just stays in next status as drift.
-2. **Capture outgoing dotfiles.** For each locally-modified managed file: show the reverse diff, then per file choose:
+1. **Capture outgoing dotfiles** (interactive only — never in headless/cron runs). For each locally-modified managed file: show the diff, then per file choose:
    - **keep & share** → `chezmoi re-add <file>` (machine wins, repo updated)
-   - **discard** → `chezmoi apply <file>` (repo wins, local edit overwritten)
-   - **skip** → decide later
+   - **discard** → `chezmoi apply --force <file>` (repo wins, local edit overwritten)
+   - **skip** → decide later (the file stays visible as drift)
    Then commit and push captured changes: `chezmoi git -- add -A`, `chezmoi git -- commit` (message prompt with sensible default), `chezmoi git -- push`.
-3. **Update tools.** `mise install` (anything missing), then `mise upgrade` for tools outdated against the (possibly just-updated) config. `mise up --bump`-style config-version bumps are a deliberate, separate action — updating a machine should converge it on the shared config, not mutate the shared config as a side effect.
+2. **Pull incoming dotfiles.** `chezmoi update` (pull --rebase + apply; rebase keeps just-captured local commits on top). In headless runs, files with uncaptured local edits make chezmoi's overwrite prompt fail rather than hang or clobber — the step reports the failure and the file stays as drift for an interactive session to resolve.
+3. **Update tools.** `mise install` (anything missing), then `mise upgrade` for tools outdated against the just-updated config. `mise up --bump`-style config-version bumps are a deliberate, separate action — updating a machine should converge it on the shared config, not mutate the shared config as a side effect.
 4. **Update myplace itself.** If a newer release exists, download the new binary and swap in place (`myplace self-update`); prompt to restart the TUI.
 5. **Re-run status** and show the closing dashboard — ideally all green.
 
