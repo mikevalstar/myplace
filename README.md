@@ -55,9 +55,27 @@ myplace self-update  # swap this binary for the latest release
 
 "In sync" is bidirectional: repo changes you haven't applied **and** local edits you haven't pushed both count as drift. Updating always shows you the diff before touching anything.
 
+## Where things live
+
+After install + a bootstrap, this is what lands where. Paths honor the XDG base dirs and assume the defaults; everything is under `$HOME`, nothing requires root.
+
+| Path | What it is |
+|------|------------|
+| `~/.local/bin/myplace` | The binary itself. Override the install dir with `MYPLACE_BIN_DIR`. |
+| `~/.local/share/chezmoi/` | chezmoi's **source clone** of this repo — the copy `myplace update` does `git pull` + apply on. The dotfiles live under its `home/` subdir (selected by [`.chezmoiroot`](home/)). Edit + push the repo, not the applied files. |
+| `~/.zshrc`, `~/.mvdotfiles.zsh`, `~/.gitconfig` | Dotfiles applied into `$HOME` from the source state. Editing these directly shows up as drift. |
+| `~/.config/mise/config.toml` | This machine's global mise tool set, rendered from `home/dot_config/mise/config.toml.tmpl`. |
+| `~/.local/state/myplace/myplace.log` | Debug log (see below). Honors `XDG_STATE_HOME`; override with `MYPLACE_STATE_DIR`. Deliberately outside `~/.config` so it never lands in your dotfiles. |
+| `~/.oh-my-zsh`, `~/.cargo` + `~/.rustup`, `~/.local/share/fnm` | Installed by the provision script — oh-my-zsh, rustup (Rust), and fnm (Node): the things mise can't own ([ADR-0007](docs/adrs/0007-provisioning-mechanism.md)). |
+| `~/.local/share/mise/` | mise's own installed tools, shims, and runtimes. |
+
+`chezmoi` and `mise` themselves are installed by `bootstrap` if missing; their location varies by platform (Homebrew on a Mac, `~/.local/bin` on a bare server). Treat `~/.config` as chezmoi's tree — machine-local state goes in the state dir above, never there ([ADR-0005](docs/adrs/0005-machine-local-state-directory.md)).
+
+Adding a tool or dotfile to the managed set: [managed-setup guide](docs/guides/managed-setup.md).
+
 ## Logs
 
-Every run appends a full debug trace — each chezmoi/mise command with its arguments, duration, and outcome, plus the run's verdict — to `~/.local/state/myplace/myplace.log` (honoring `XDG_STATE_HOME`; override with `MYPLACE_STATE_DIR`). It's deliberately outside `~/.config` so it never lands in your dotfiles. The file self-rotates past ~5 MB. Tail it when something misbehaves on a machine you'll next see in three weeks:
+Every run appends a full debug trace — each chezmoi/mise command with its arguments, duration, and outcome, plus the run's verdict — to `~/.local/state/myplace/myplace.log` (see [Where things live](#where-things-live) for overrides). The file self-rotates past ~5 MB. Tail it when something misbehaves on a machine you'll next see in three weeks:
 
 ```sh
 tail -f ~/.local/state/myplace/myplace.log
