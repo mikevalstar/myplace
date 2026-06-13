@@ -59,14 +59,19 @@ func (m Model) loadCmd() tea.Cmd {
 }
 
 // updateCmd resolves incoming drift and tools — the same converge-only
-// behavior as headless `myplace update --yes`. Outgoing capture (re-add,
-// commit, push) stays a deliberate CLI action for now.
+// behavior as headless `myplace update --yes`. Capturing OUTGOING edits
+// (keep/discard per file) needs interactive prompts the dashboard doesn't
+// host yet, so when local edits exist we skip the dotfiles apply (rather
+// than clobber them) and point the user at the CLI capture flow.
 func (m Model) updateCmd() tea.Cmd {
+	hasLocalEdits := m.report != nil && len(m.report.Dotfiles.LocalModified) > 0
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 		var errs []string
-		if err := m.ch.Update(ctx); err != nil {
+		if hasLocalEdits {
+			errs = append(errs, "local edits present — run `myplace update` in a terminal to review them (keep/discard); skipped dotfiles apply to avoid overwriting")
+		} else if err := m.ch.Update(ctx); err != nil {
 			errs = append(errs, "chezmoi update: "+err.Error())
 		}
 		m.ms.Trust(ctx)

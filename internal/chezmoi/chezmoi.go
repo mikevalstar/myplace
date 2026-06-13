@@ -18,9 +18,16 @@ type Client struct {
 
 func New(r run.Runner) *Client { return &Client{r: r} }
 
+// cz runs chezmoi with --no-tty always set, so a conflict prompt can never
+// open /dev/tty and hang a caller (notably the TUI, which owns the terminal).
+// With no TTY and a closed stdin, chezmoi fails fast instead of blocking.
+func (c *Client) cz(ctx context.Context, args ...string) ([]byte, error) {
+	return c.r.Run(ctx, "", "chezmoi", append([]string{"--no-tty"}, args...)...)
+}
+
 // Installed reports whether the chezmoi binary is available.
 func (c *Client) Installed(ctx context.Context) bool {
-	_, err := c.r.Run(ctx, "", "chezmoi", "--version")
+	_, err := c.cz(ctx, "--version")
 	return err == nil
 }
 
@@ -29,7 +36,7 @@ func (c *Client) Installed(ctx context.Context) bool {
 // and some chezmoi commands auto-create the directory empty — so require a
 // non-empty dir.
 func (c *Client) Initialized(ctx context.Context) bool {
-	out, err := c.r.Run(ctx, "", "chezmoi", "source-path")
+	out, err := c.cz(ctx, "source-path")
 	if err != nil {
 		return false
 	}
@@ -44,7 +51,7 @@ func (c *Client) Initialized(ctx context.Context) bool {
 // Profile returns the machine profile from chezmoi's template data
 // (set by home/.chezmoi.toml.tmpl on init).
 func (c *Client) Profile(ctx context.Context) (string, error) {
-	out, err := c.r.Run(ctx, "", "chezmoi", "data", "--format", "json")
+	out, err := c.cz(ctx, "data", "--format", "json")
 	if err != nil {
 		return "", err
 	}
@@ -86,7 +93,7 @@ func ParseStatus(out []byte) []FileStatus {
 }
 
 func (c *Client) Status(ctx context.Context) ([]FileStatus, error) {
-	out, err := c.r.Run(ctx, "", "chezmoi", "status")
+	out, err := c.cz(ctx, "status")
 	if err != nil {
 		return nil, err
 	}
@@ -95,12 +102,12 @@ func (c *Client) Status(ctx context.Context) ([]FileStatus, error) {
 
 // Fetch updates remote tracking refs in the source repo (network).
 func (c *Client) Fetch(ctx context.Context) error {
-	_, err := c.r.Run(ctx, "", "chezmoi", "git", "--", "fetch", "--quiet")
+	_, err := c.cz(ctx, "git", "--", "fetch", "--quiet")
 	return err
 }
 
 func (c *Client) revListCount(ctx context.Context, rang string) (int, error) {
-	out, err := c.r.Run(ctx, "", "chezmoi", "git", "--", "rev-list", "--count", rang)
+	out, err := c.cz(ctx, "git", "--", "rev-list", "--count", rang)
 	if err != nil {
 		return 0, err
 	}
@@ -119,7 +126,7 @@ func (c *Client) AheadUpstream(ctx context.Context) (int, error) {
 
 // Uncommitted is the number of dirty paths in the source repo working tree.
 func (c *Client) Uncommitted(ctx context.Context) (int, error) {
-	out, err := c.r.Run(ctx, "", "chezmoi", "git", "--", "status", "--porcelain")
+	out, err := c.cz(ctx, "git", "--", "status", "--porcelain")
 	if err != nil {
 		return 0, err
 	}
@@ -132,42 +139,42 @@ func (c *Client) Uncommitted(ctx context.Context) (int, error) {
 
 // Update pulls the source repo and applies the result (chezmoi update).
 func (c *Client) Update(ctx context.Context) error {
-	_, err := c.r.Run(ctx, "", "chezmoi", "update")
+	_, err := c.cz(ctx, "update")
 	return err
 }
 
 // Diff shows what `chezmoi apply` would change for one target (absolute path).
 // For a locally-modified file this is the change that would UNDO the local edit.
 func (c *Client) Diff(ctx context.Context, target string) (string, error) {
-	out, err := c.r.Run(ctx, "", "chezmoi", "diff", target)
+	out, err := c.cz(ctx, "diff", target)
 	return string(out), err
 }
 
 // ReAdd captures the local state of a target back into the source repo
 // (machine wins).
 func (c *Client) ReAdd(ctx context.Context, target string) error {
-	_, err := c.r.Run(ctx, "", "chezmoi", "re-add", target)
+	_, err := c.cz(ctx, "re-add", target)
 	return err
 }
 
 // ApplyForce overwrites a target with the source state (repo wins).
 func (c *Client) ApplyForce(ctx context.Context, target string) error {
-	_, err := c.r.Run(ctx, "", "chezmoi", "apply", "--force", target)
+	_, err := c.cz(ctx, "apply", "--force", target)
 	return err
 }
 
 // CommitAll stages and commits everything in the source repo.
 func (c *Client) CommitAll(ctx context.Context, message string) error {
-	if _, err := c.r.Run(ctx, "", "chezmoi", "git", "--", "add", "-A"); err != nil {
+	if _, err := c.cz(ctx, "git", "--", "add", "-A"); err != nil {
 		return err
 	}
-	_, err := c.r.Run(ctx, "", "chezmoi", "git", "--", "commit", "-m", message)
+	_, err := c.cz(ctx, "git", "--", "commit", "-m", message)
 	return err
 }
 
 // Push pushes the source repo to its upstream.
 func (c *Client) Push(ctx context.Context) error {
-	_, err := c.r.Run(ctx, "", "chezmoi", "git", "--", "push")
+	_, err := c.cz(ctx, "git", "--", "push")
 	return err
 }
 
@@ -179,6 +186,6 @@ func (c *Client) InitApply(ctx context.Context, repo, profile string) error {
 		args = append(args, "--promptChoice", "profile="+profile)
 	}
 	args = append(args, repo)
-	_, err := c.r.Run(ctx, "", "chezmoi", args...)
+	_, err := c.cz(ctx, args...)
 	return err
 }

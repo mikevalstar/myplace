@@ -22,6 +22,10 @@ type Exec struct{}
 func (Exec) Run(ctx context.Context, dir string, name string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
+	// Closed stdin (not the inherited terminal): a child that tries to prompt
+	// gets EOF and fails fast instead of blocking forever — critical when the
+	// caller is the TUI, which owns the real TTY.
+	cmd.Stdin = nil
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
