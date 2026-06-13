@@ -44,6 +44,7 @@ The same person is both audiences: at a Mac, you want the TUI; across twelve ser
 | `myplace update` | TUI review-and-apply flow | `--yes [--dotfiles] [--tools]`, plus `--json` for the result report |
 | `myplace self-update` | confirm prompt | `--yes`, `--json` |
 | `myplace version` | plain text | `--json` |
+| `myplace help` | cobra help (opens with an agent pointer) | `--llm` brief, `--json` manifest — see [LLM-friendly help](llm-friendly-help.md) |
 
 `myplace bootstrap --repo git@... --profile server --yes` is the one-command server bootstrap: installer one-liner, then this, done.
 

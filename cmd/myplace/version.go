@@ -17,6 +17,12 @@ func newVersionCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print the myplace version",
+		Annotations: map[string]string{
+			annHeadless:     "myplace version --json",
+			annExitCodes:    "0=success",
+			annOutputSchema: "docs/features/headless-cli-and-json-output.md",
+			annInteractive:  "false",
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			if jsonOut {
 				emitJSON(map[string]any{"schema": drift.Schema, "version": version.Version})
@@ -34,6 +40,13 @@ func newSelfUpdateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "self-update",
 		Short: "Replace this binary with the latest GitHub release",
+		Annotations: map[string]string{
+			annHeadless:     "myplace self-update --json",
+			annExitCodes:    "0=updated or already current;3=error",
+			annOutputSchema: "docs/features/headless-cli-and-json-output.md",
+			annInteractive:  "false",
+			annNote:         "replaces this binary in place from the latest GitHub release and runs unattended (no prompt). --json reports {updated: bool, version}.",
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			tag, err := release.SelfUpdate(cmd.Context(), version.Version)
 			switch {

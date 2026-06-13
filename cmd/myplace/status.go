@@ -38,6 +38,12 @@ func newStatusCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 		Long: "Checks dotfiles (behind origin, unapplied, locally modified, unpushed) and\n" +
 			"tools (missing, outdated) without changing anything.\n" +
 			"Exit codes: 0 in sync, 1 drifted, 2 unknown, 3 error.",
+		Annotations: map[string]string{
+			annHeadless:     "myplace status --json",
+			annExitCodes:    exitCodesDrift,
+			annOutputSchema: "docs/features/headless-cli-and-json-output.md",
+			annInteractive:  "true",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			rep := drift.Compute(cmd.Context(), ch, ms, version.Version)
 			logger.Info("status", "verdict", rep.Verdict,

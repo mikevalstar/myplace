@@ -12,7 +12,7 @@ Target machines: personal Macs, a work Mac, and assorted Linux servers — one c
 
 This repo is a monorepo: the Go app, the chezmoi dotfiles (under [home/](home/), via `.chezmoiroot`), and the machines' mise config all live here — one clone carries everything ([ADR-0003](docs/adrs/0003-monorepo-app-dotfiles-mise.md)).
 
-> 🚧 **v0.** Bootstrap, status (TUI + `--json`), update with interactive capture of local edits, and `self-update` all work. Not yet built: per-file diff review before apply, `push: false` profile policy, and the phase-2 server.
+> 🚧 **v0.** Bootstrap, status (TUI + `--json`), update with interactive capture of local edits, `self-update`, and self-describing help (`help --llm`/`--json`) all work. Not yet built: per-file diff review before apply, `push: false` profile policy, and the phase-2 server.
 
 ## Install
 
@@ -96,6 +96,18 @@ done
 ```
 
 Contract details (schema versioning, non-interactive rules): [headless CLI spec](docs/features/headless-cli-and-json-output.md).
+
+### Self-describing help, for agents and humans
+
+The CLI describes itself so an agent (or a human filling an LLM context) can learn to drive every command from one read — no scraping a dozen `--help` screens:
+
+```sh
+myplace help --llm    # copy-paste brief: every command, exit codes, and workflow recipes (ANSI-free)
+myplace help --json   # the same as a machine-readable manifest (flags, defaults, required-off-a-TTY, exit codes)
+myplace help status --json   # scope either view to one command
+```
+
+Both views are generated from the live command tree, so they can't drift from the real flags. Plain `myplace help` (and `myplace --help`) opens with a pointer to them. Design: [LLM-friendly help spec](docs/features/llm-friendly-help.md).
 
 ## Roadmap
 

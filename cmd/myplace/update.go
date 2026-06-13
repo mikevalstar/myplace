@@ -37,6 +37,14 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 			"managed files so you can keep (re-add + push) or discard them. Headless\n" +
 			"(--yes) never captures or overwrites local edits — it reports them and skips\n" +
 			"the dotfiles apply, leaving the rest of the update to proceed.",
+		Annotations: map[string]string{
+			annHeadless:     "myplace update --yes --json",
+			annRequired:     "yes",
+			annExitCodes:    exitCodesConverge,
+			annOutputSchema: "docs/workflows/update-machine.md",
+			annInteractive:  "true",
+			annNote:         "headless (--yes) is converge-only: it applies incoming changes and upgrades tools but never captures or pushes local edits. Files with local edits are reported and skipped (exit 1). Run interactive `myplace update` to keep/discard/push them.",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			if !ch.Installed(ctx) || !ch.Initialized(ctx) {

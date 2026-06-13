@@ -41,15 +41,38 @@ func main() {
 	ch := chezmoi.New(r)
 	ms := mise.New(r)
 
+	root := newRootCmd(ch, ms)
+
+	if err := root.Execute(); err != nil {
+		logger.Error("exit with error", "err", err.Error())
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(3)
+	}
+	logger.Info("exit ok")
+}
+
+// newRootCmd builds the fully-wired command tree: the subcommands, the custom
+// help command (which also powers `help --json` and `help --llm`), and the
+// per-command annotations the manifest reads back (see help.go). Shared by
+// main and the help tests so the tree under test is exactly the real one.
+func newRootCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "myplace",
 		Short: "Bootstrap, update, and check machines managed by chezmoi + mise",
-		Long: "myplace orchestrates chezmoi (dotfiles) and mise (tools) to bootstrap new\n" +
+		Long: "AI agents: run `myplace help --llm` for a copy-paste brief of every command,\n" +
+			"or `myplace help --json` for a machine-readable manifest.\n\n" +
+			"myplace orchestrates chezmoi (dotfiles) and mise (tools) to bootstrap new\n" +
 			"machines, update existing ones, and report drift. Run with no arguments\n" +
 			"for the TUI dashboard; every subcommand also works headlessly (--json).\n\n" +
 			"Debug log: " + logging.Path(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		Annotations: map[string]string{
+			annHeadless:    "myplace status --json",
+			annExitCodes:   exitCodesDrift,
+			annInteractive: "true",
+			annNote:        "bare `myplace` with a TTY launches the dashboard; off a TTY (agent or pipe) it prints the status summary and exits with the drift code. Prefer `myplace status --json`.",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			if !ch.Installed(ctx) || !ch.Initialized(ctx) {
@@ -74,6 +97,11 @@ func main() {
 		},
 	}
 
+	// Keep the command surface focused on myplace's own verbs: drop cobra's
+	// auto-generated `completion` command so it doesn't show up in help or the
+	// agent manifest.
+	root.CompletionOptions.DisableDefaultCmd = true
+	root.SetHelpCommand(newHelpCmd())
 	root.AddCommand(
 		newStatusCmd(ch, ms),
 		newUpdateCmd(ch, ms),
@@ -81,13 +109,7 @@ func main() {
 		newVersionCmd(),
 		newSelfUpdateCmd(),
 	)
-
-	if err := root.Execute(); err != nil {
-		logger.Error("exit with error", "err", err.Error())
-		fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(3)
-	}
-	logger.Info("exit ok")
+	return root
 }
 
 // subcommand returns the first non-flag argument (the cobra subcommand) for

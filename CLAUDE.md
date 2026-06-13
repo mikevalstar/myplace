@@ -26,6 +26,7 @@ When a decision changes, don't edit history: supersede the old ADR with a new on
 - Doc `status` values: `draft` → `accepted`/`active` → `superseded`/`deprecated`
 - Dates in frontmatter are ISO format: `2026-06-12`
 - **The README is part of the spec**: its install/usage sections must be updated in the same change whenever the command surface, flags, or install story changes. Docs explain design; the README shows a user how to run it.
+- **The agent help is part of the contract**: `myplace help --json`/`--llm` is the primary way AI agents and scripts discover this tool, and it's generated from the cobra command tree — treat it like the docs and README, something to keep current rather than an afterthought. Whenever you add or change a command or flag, set/update that command's cobra `Annotations` (canonical headless invocation, `required` flags off a TTY, exit-code meanings, output-schema doc path) in the same change so the manifest stays truthful. `cmd/myplace/help_test.go` walks the tree and fails if a command is missing what it owes, so this can't silently drift. See the [LLM-friendly help spec](docs/features/llm-friendly-help.md).
 
 ## Key external tools
 
@@ -56,4 +57,4 @@ This repo is simultaneously the app, the chezmoi source repo, and the mise confi
 
 ## Project state
 
-v0 implemented and verified end-to-end: `bootstrap` (wizard + headless), `status` (TUI dashboard + `--json`, spec'd exit codes, includes outdated-binary check), `update` (interactive: per-file capture of local edits then converge; headless: converge-only), `self-update` (GitHub releases). Persistent debug log to `$XDG_STATE_HOME/myplace/myplace.log` (ADR-0005, logging feature spec). Releases: tag `v*` → goreleaser via Actions (ADR-0004); `install.sh` at repo root is the installer. Not yet built: per-file diff review before apply, `push: false` profile policy, phase-2 server.
+v0 implemented and verified end-to-end: `bootstrap` (wizard + headless), `status` (TUI dashboard + `--json`, spec'd exit codes, includes outdated-binary check), `update` (interactive: per-file capture of local edits then converge; headless: converge-only), `self-update` (GitHub releases), `help --llm`/`--json` (self-describing agent manifest + brief generated from the cobra tree; per-command facts live in cobra `Annotations`, enforced by `cmd/myplace/help_test.go`). Persistent debug log to `$XDG_STATE_HOME/myplace/myplace.log` (ADR-0005, logging feature spec). Releases: tag `v*` → goreleaser via Actions (ADR-0004); `install.sh` at repo root is the installer. Not yet built: per-file diff review before apply, `push: false` profile policy, phase-2 server.

@@ -41,6 +41,13 @@ func newBootstrapCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bootstrap",
 		Short: "Set up a fresh machine: install chezmoi + mise, apply dotfiles, install tools",
+		Annotations: map[string]string{
+			annHeadless:    "myplace bootstrap --profile <name> --yes",
+			annRequired:    "profile,yes",
+			annExitCodes:   exitCodesConverge,
+			annInteractive: "true",
+			annNote:        "repo and git identity default to this setup's owner, so --profile (personal-mac|work-mac|server) and --yes are the only flags a headless run needs. Bootstrap streams progress to stderr and ends with a status summary; it has no --json document.",
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runBootstrap(cmd, ch, ms, opts)
 		},
