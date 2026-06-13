@@ -90,7 +90,7 @@ So `myplace outdated --json; echo $?` tells an agent "is anything upgradable her
 ### TUI
 
 - **Dashboard home** gains an **"Updates available"** pane next to Dotfiles and Tools, showing per-source counts (`mise: N`, `brew: M`, or `n/a` when a source is absent) and a `press o for details` hint. It loads asynchronously alongside the status report; until it lands the pane shows `checking…`. It does **not** change the verdict badge.
-- **`o`** opens a dedicated, scrollable outdated view (a `bubbles` viewport) listing every outdated package grouped by source. `↑/↓`/`pgup`/`pgdn` scroll; `esc`/`q` returns to the dashboard; `ctrl+c` quits.
+- **`o`** opens a dedicated, scrollable outdated view (a `bubbles` viewport) rendering every outdated package as a bordered `lipgloss/table` (PACKAGE · CURRENT · LATEST · SOURCE). It carries a **count summary** (`N outdated across M sources`, and `X of N shown` when filtered), a **sort** toggle (`s` cycles by source / by name; by-source keeps the grouped layout, by-name flattens into one alphabetical list annotated with each package's source), and a **filter** (`/` focuses a text input for a case-insensitive substring match on the package name; `esc` clears it). `↑/↓`/`pgup`/`pgdn` scroll; `esc`/`q` returns to the dashboard; `ctrl+c` quits. Sort and filter are pure presentation over the already-collected inventory — no recompute, no extra command runs.
 
 ## Acceptance criteria
 
@@ -100,6 +100,7 @@ So `myplace outdated --json; echo $?` tells an agent "is anything upgradable her
 - [x] `myplace status --json` verdict and exit code are **unchanged** by brew/unmanaged packages being outdated (proves the informational separation).
 - [x] `myplace help --json`/`--llm` lists `outdated` with its exit codes and this doc as its output schema.
 - [x] Dashboard shows the "Updates available" pane with per-source counts; `o` opens a scrollable detail view; `esc` returns.
+- [ ] The `o` view shows a count summary and supports `s` (sort by source / name) and `/` (filter by name); both are presentation-only and run no extra command.
 - [x] Nothing in this feature ever installs or upgrades a package.
 
 ## Open questions
