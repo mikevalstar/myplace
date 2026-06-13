@@ -33,9 +33,10 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 		Use:   "update",
 		Short: "Pull and apply dotfiles, install and upgrade tools",
 		Long: "Converges this machine on the shared config: chezmoi update (pull + apply),\n" +
-			"then mise install + upgrade. Capturing OUTGOING drift (re-add, commit, push)\n" +
-			"is deliberately not part of unattended updates — review local edits in the\n" +
-			"source repo (chezmoi cd) until interactive capture lands.",
+			"then mise install + upgrade. Interactively, it first walks any local edits to\n" +
+			"managed files so you can keep (re-add + push) or discard them. Headless\n" +
+			"(--yes) never captures or overwrites local edits — it reports them and skips\n" +
+			"the dotfiles apply, leaving the rest of the update to proceed.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			if !ch.Installed(ctx) || !ch.Initialized(ctx) {
@@ -91,7 +92,28 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 			}
 
 			if doDotfiles {
-				step("chezmoi update", func() error { return ch.Update(ctx) })
+				// `chezmoi update` (pull + apply) aborts on a managed file that
+				// has uncaptured local edits — apply would overwrite it, so
+				// chezmoi prompts, and with no TTY that prompt fails. Detect
+				// that up front and report it plainly instead of letting it
+				// surface as a cryptic "EOF". Capturing (keep/discard) is the
+				// resolution; in headless runs it must be done interactively.
+				if mods := localModified(ctx, ch); len(mods) > 0 {
+					var hint string
+					if yes {
+						hint = "run `myplace update` (interactive) to keep or discard them"
+					} else {
+						hint = "re-run and choose keep or discard instead of skip"
+					}
+					msg := fmt.Sprintf("not applied — local edits to %s; %s", strings.Join(mods, ", "), hint)
+					logger.Error("update dotfiles skipped (local edits)", "files", strings.Join(mods, ","))
+					if !jsonOut {
+						fmt.Fprintf(os.Stderr, "%-16s SKIPPED: %s\n", "chezmoi update", msg)
+					}
+					steps = append(steps, stepResult{Name: "chezmoi update", OK: false, Error: msg})
+				} else {
+					step("chezmoi update", func() error { return ch.Update(ctx) })
+				}
 			}
 			if doTools {
 				ms.Trust(ctx)
@@ -119,6 +141,24 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 	cmd.Flags().BoolVar(&dotfilesOnly, "dotfiles", false, "only update dotfiles")
 	cmd.Flags().BoolVar(&toolsOnly, "tools", false, "only update tools")
 	return cmd
+}
+
+// localModified returns the managed files that differ from what chezmoi last
+// wrote (outgoing drift). These block a plain apply, so the converge step
+// checks for them first. A status error returns nil — don't block the update
+// on an inability to read status.
+func localModified(ctx context.Context, ch *chezmoi.Client) []string {
+	files, err := ch.Status(ctx)
+	if err != nil {
+		return nil
+	}
+	var mods []string
+	for _, f := range files {
+		if f.LocalChanged {
+			mods = append(mods, f.Path)
+		}
+	}
+	return mods
 }
 
 // captureOutgoing walks locally-modified managed files and lets the user
