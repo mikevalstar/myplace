@@ -38,6 +38,7 @@ Option A. Specifics that other code depends on:
 - **`self-update`** compares the running version against the GitHub API's `releases/latest` tag and swaps the binary in place from the same latest/download URL — **after verifying the downloaded archive's SHA256 against `checksums.txt`**. The archive is buffered and checked before anything overwrites the running executable.
 - **`checksums.txt`** is downloaded from the same `releases/latest/download/` path (goreleaser's default name) and parsed as standard `sha256sum` lines (`<hex>  <filename>`).
 - A separate `ci.yml` runs `go test`/`go vet`/`gofmt` on every push — release tags should never be the first time code is built in CI.
+- **`.github/dependabot.yml`** keeps the Go module graph and the workflow Actions current (weekly, grouped, with a cooldown so brand-new releases aren't adopted the day they ship — the same supply-chain caution as checksum-verifying our own release archives).
 
 ## Consequences
 

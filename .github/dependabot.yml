@@ -1,0 +1,54 @@
+# Dependabot version updates — keeps the Go module graph and the release/CI
+# workflow Actions current. Security updates (from Dependabot alerts) are
+# separate and always open immediately; the cooldown below applies only to
+# routine version bumps.
+#
+# Design:
+#  - Weekly cadence, grouped to keep PR noise low (one PR for routine bumps).
+#  - cooldown: don't adopt a release the day it ships — give security vendors
+#    time to flag a poisoned version. Same supply-chain caution as verifying
+#    release checksums (ADR-0004).
+#  - Minor/patch are grouped and auto-cooled; majors get their own PR so a
+#    breaking bump (e.g. actions/checkout v4 -> v5) gets a deliberate review.
+version: 2
+updates:
+  # Go modules (go.mod at the repo root).
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "go"
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    groups:
+      go-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions used by .github/workflows/*.yml.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
