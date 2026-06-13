@@ -2,11 +2,14 @@
 # arguments, one per line. bat is installed via mise on every machine.
 # Docs: https://github.com/sharkdp/bat#configuration-file
 
-# Theme. This is a bat built-in (see `bat --list-themes`). Catppuccin is not a
-# built-in — it needs theme files dropped in bat's config dir plus a
-# `bat cache --build`, which can't run during provisioning (bat installs after
-# the provision script). Left as a follow-up; TwoDark suits the dark setup.
---theme="TwoDark"
+# Theme. bat 0.25+ bundles the Catppuccin family, so no theme files or
+# `bat cache --build` are needed. "auto" detects the terminal background and
+# picks the dark/light variant below — Mocha in the dark, Latte in the light,
+# matching the system light/dark setup (same flavors as Zed). Detection falls
+# back to the dark theme over SSH and in pipes, which is what we want.
+--theme="auto"
+--theme-dark="Catppuccin Mocha"
+--theme-light="Catppuccin Latte"
 
 # Line numbers, git-modification markers, and a filename header — no heavy grid.
 --style="numbers,changes,header"
