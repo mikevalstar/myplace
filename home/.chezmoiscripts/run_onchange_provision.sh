@@ -139,6 +139,10 @@ fi
 ensure_tool http httpie
 ensure_tool mosh mosh
 
+# btop's mise (aqua) package is linux-only, so mise installs it on the Linux
+# fleet; on macOS it comes from brew-if-present here instead (ADR-0008).
+[ "$(uname -s)" = "Darwin" ] && ensure_tool btop btop
+
 # --- fonts (macOS-only Homebrew casks; the Linux fleet is headless servers — ADR-0009) ---
 ensure_cask font-monaspace-nf
 ensure_cask font-symbols-only-nerd-font

@@ -21,8 +21,12 @@ pnpm = "latest"
 gh = "latest"
 delta = "latest"
 herdr = "latest"
-btop = "latest"
 lazygit = "latest"
+{{ if eq .chezmoi.os "linux" -}}
+# btop's only mise backend (aqua) ships linux binaries only; macOS gets it via
+# brew in run_onchange_provision.sh (ADR-0008).
+btop = "latest"
+{{ end -}}
 
 [settings]
 experimental = false
