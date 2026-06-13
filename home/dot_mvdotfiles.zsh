@@ -101,10 +101,19 @@ alias lvim="NVIM_APPNAME=LazyVim nvim"
 alias cdd="cd_to_dir"
 alias bj="bjourn"
 
-# Next level of an ls 
+# eza — a nicer ls. The config dir is harmless everywhere, but the aliases that
+# shadow `ls`/`ll`/`la` add icons/colors/git columns that break coding agents
+# parsing ls output, so gate them on MYPLACE_INTERACTIVE_SHELL (set in .zshrc).
+# Agents keep the real `ls`; humans get eza. See docs/guides/agent-friendly-shell.md.
 # options :  --no-filesize --no-time --no-permissions --no-user --color=always --icons=always
 export EZA_CONFIG_DIR="$HOME/.config/eza"
-alias lss="eza --long " 
+if [[ "${MYPLACE_INTERACTIVE_SHELL:-1}" == 1 ]]; then
+    alias ls="eza --icons=auto --git"
+    alias ll="eza --long --icons=auto --git"
+    alias la="eza --long --all --icons=auto --git"
+    alias lt="eza --tree --level=2 --icons=auto"
+    alias lss="eza --long"
+fi
 
 ## Some ENV things
 export EDITOR="nvim"
