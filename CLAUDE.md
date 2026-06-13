@@ -55,6 +55,19 @@ This repo is simultaneously the app, the chezmoi source repo, and the mise confi
 - Machine-local state (logs now, caches later) lives under `$XDG_STATE_HOME/myplace` (ADR-0005), **never** `~/.config` — that's chezmoi's tree. Every external command is logged via the `run.Runner` choke point.
 - **Provisioning split (ADR-0007):** mise installs registry CLI tools (in `home/dot_config/mise/config.toml.tmpl`); `home/.chezmoiscripts/run_onchange_provision.sh` installs what mise can't — oh-my-zsh + plugins, rustup, fnm. **Node is fnm's and Rust is rustup's — never add them to mise.** Adding a tool/dotfile? See `docs/guides/managed-setup.md`.
 
+## Dogfooding myplace on setup changes
+
+When the request is to change the **machine setup** — a mise tool, a dotfile, an alias, a provision step under `home/**` — rather than the app code, drive and verify it through `myplace`, not by hand-running `chezmoi apply` / `mise install`. Running the tool on its own config is the point, and it's the quickest way to catch a change that breaks `apply`.
+
+- **Learn the command surface from the tool, not memory:** `myplace help --llm` (or `--json`) is generated from the command tree — authoritative, lists every command/flag/exit code. Don't restate it here. All data commands take `--json`; exit codes: `0` in sync · `1` drifted · `2` unknown · `3` error. Off a TTY, bare `myplace` prints the status summary instead of launching the TUI — but prefer `myplace status --json`.
+- **Inspect anytime (read-only, safe):** `myplace status` / `myplace status --json` shows drift in both directions.
+- **myplace applies from the source clone, not this checkout.** chezmoi/myplace read `~/.local/share/chezmoi/` — a *separate* clone of this repo — so an edit under `home/**` here is invisible to `status`/`update` until it's committed and pushed to `main` (the branch every machine's `update` pulls; setup edits land on `main`, not a feature branch). The loop to land a change on this machine:
+  1. Edit the file under `home/` — where things go: [managed-setup guide](docs/guides/managed-setup.md).
+  2. Commit + push to `origin/main` (the push is what makes it take effect — confirm before pushing per the usual rules).
+  3. `myplace update` (headless: `myplace update --yes --json`) — pulls origin into the source clone, applies dotfiles, upgrades tools. `--yes` is converge-only: it won't capture local edits made directly in `$HOME`.
+  4. `myplace status` — confirm it's back to in sync (exit `0`).
+- **Don't run `update`/`bootstrap` just to test the app** — they mutate this real machine. Exercise app behavior with `status`, `help`, and the Go tests instead.
+
 ## Project state
 
 v0 implemented and verified end-to-end: `bootstrap` (wizard + headless), `status` (TUI dashboard + `--json`, spec'd exit codes, includes outdated-binary check), `update` (interactive: per-file capture of local edits then converge; headless: converge-only), `self-update` (GitHub releases), `help --llm`/`--json` (self-describing agent manifest + brief generated from the cobra tree; per-command facts live in cobra `Annotations`, enforced by `cmd/myplace/help_test.go`). Persistent debug log to `$XDG_STATE_HOME/myplace/myplace.log` (ADR-0005, logging feature spec). Releases: tag `v*` → goreleaser via Actions (ADR-0004); `install.sh` at repo root is the installer. Not yet built: per-file diff review before apply, `push: false` profile policy, phase-2 server.
