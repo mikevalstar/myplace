@@ -45,4 +45,5 @@ Bootstrap runs `chezmoi apply` (which runs the provision script) *before* `mise 
 
 - [ADR-0003](0003-monorepo-app-dotfiles-mise.md) — the mise config is a managed dotfile; this ADR says what goes in it vs scripts
 - [ADR-0002](0002-go-and-charm-for-the-tui.md), bootstrap & update workflows
+- [ADR-0008](0008-opportunistic-homebrew-macos.md) — extends the "what mise can't own" branch with an opportunistic-Homebrew path on macOS
 - [managed-setup guide](../guides/managed-setup.md) — how to add a tool or dotfile

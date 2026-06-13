@@ -18,7 +18,7 @@ Where things live and how to add a new tool, dotfile, or provisioning step so it
 | Path | What it is |
 |------|------------|
 | `dot_config/mise/config.toml.tmpl` | The mise tool set — every machine's CLI tools/runtimes from mise's registry |
-| `.chezmoiscripts/run_onchange_provision.sh` | Idempotent installer for git, oh-my-zsh + plugins, rustup, fnm (things mise can't own) |
+| `.chezmoiscripts/run_onchange_provision.sh` | Idempotent installer for the things mise can't own — git, oh-my-zsh + plugins, rustup, fnm, and plain OS/brew packages via `ensure_tool` (httpie, mosh) |
 | `dot_zshrc` | The managed `~/.zshrc` — oh-my-zsh setup, mise activation, tool env wiring |
 | `dot_gitconfig.tmpl` | Git identity (`~/.gitconfig`) — name/email, rendered from install-time data (`.gitName`/`.gitEmail`) |
 | `dot_mvdotfiles.zsh` | Personal shell config (`~/.mvdotfiles.zsh`) sourced by `.zshrc`: tool inits, aliases, functions |
@@ -37,16 +37,23 @@ Where things live and how to add a new tool, dotfile, or provisioning step so it
    ```
 3. Commit & push. On each machine, `myplace update` (or `mise install`) picks it up.
 
-### A tool mise doesn't carry, or an installer/framework
+### A tool mise doesn't carry
 
-Add a guarded block to `.chezmoiscripts/run_onchange_provision.sh`. Always guard so re-runs are no-ops:
+Both cases live in `.chezmoiscripts/run_onchange_provision.sh`. It's `run_onchange_`, so editing it re-runs on the next apply; keep every step guarded and failure-tolerant (`|| log …`) so re-runs and network blips are harmless.
+
+**A plain package** that the OS package managers / Homebrew carry (e.g. `httpie`, `mosh`) — add one `ensure_tool` line. It installs via the system package manager on Linux and via Homebrew *if it's already present* on macOS, logging a note otherwise (bootstrap never requires brew — [ADR-0008](../adrs/0008-opportunistic-homebrew-macos.md)):
+```sh
+ensure_tool http httpie   # ensure_tool <command-to-check> <package-name>
+ensure_tool mosh mosh
+```
+
+**An installer or framework** with its own install script (rustup, fnm, oh-my-zsh — not a packaged binary) — add a guarded block:
 ```sh
 if ! command -v <tool> >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/<tool>" ]; then
   log "installing <tool>"
   curl -fsSL <installer> | sh -s -- <non-interactive-flags> || log "<tool> install failed"
 fi
 ```
-Because the file is `run_onchange_`, editing it re-runs it on the next apply. Keep it failure-tolerant (`|| log …`) — a network blip shouldn't abort the whole apply.
 
 ### A new dotfile
 
@@ -64,6 +71,7 @@ Tool init (`eval "$(x init zsh)"`, PATH additions) goes in `dot_mvdotfiles.zsh`,
 - **The provision script runs before `mise install`** (during `chezmoi apply`), so it can't use any mise tool.
 - **oh-my-zsh install must keep our `.zshrc`** — the script passes `KEEP_ZSHRC=yes`. Don't drop it or the managed `.zshrc` gets overwritten with OMZ's template.
 - **Editing the managed `.zshrc` on a machine** shows as drift (it's managed now); change it in the repo and `myplace update`, or use the capture flow.
+- **Homebrew on macOS is opportunistic, never required.** `ensure_tool` uses brew when it's present and logs a note when it isn't, so a brew-less Mac still bootstraps; anything in mise's registry still belongs in mise, not here ([ADR-0008](../adrs/0008-opportunistic-homebrew-macos.md)).
 
 ## References
 

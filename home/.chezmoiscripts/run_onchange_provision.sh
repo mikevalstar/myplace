@@ -33,6 +33,27 @@ pm_install() {
 	fi
 }
 
+# ensure_tool CMD PKG — install a non-registry CLI tool when CMD is missing.
+# Linux: the system package manager (pm_install). macOS: Homebrew *if present*
+# (ADR-0008) — never required, so a brew-less Mac just gets a logged note and the
+# bootstrap stays brew-free. Idempotent: a tool already on PATH is a no-op.
+ensure_tool() {
+	cmd="$1"
+	pkg="$2"
+	command -v "$cmd" >/dev/null 2>&1 && return 0
+	if [ "$(uname -s)" = "Darwin" ]; then
+		if command -v brew >/dev/null 2>&1; then
+			log "installing $pkg (brew)"
+			brew install "$pkg" || log "$pkg brew install failed"
+		else
+			log "$pkg missing and no Homebrew on this Mac — run 'brew install $pkg' or install manually"
+		fi
+	else
+		log "installing $pkg"
+		pm_install "$pkg" || log "$pkg install failed (no known package manager?)"
+	fi
+}
+
 # --- git (prerequisite for chezmoi and the clones below; not a mise tool) ---
 # chezmoi's built-in git can clone the source repo on a machine with no system
 # git, so this can run first and install real git before it's needed below.
@@ -97,3 +118,7 @@ if ! command -v fnm >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/fnm" ]; then
 		log "bash unavailable; skipping fnm (install bash, then re-run apply)"
 	fi
 fi
+
+# --- non-registry CLI tools (not in mise's registry; brew-if-present on macOS, ADR-0008) ---
+ensure_tool http httpie
+ensure_tool mosh mosh
