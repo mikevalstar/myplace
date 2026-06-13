@@ -10,6 +10,29 @@ set -u
 
 log() { printf 'myplace provision: %s\n' "$1" >&2; }
 
+# pm_install PKG — install a system package via the detected Linux package
+# manager. Best-effort: returns non-zero if no known manager is present or the
+# install fails, so callers can log and continue. (macOS has no system package
+# manager here by rule — callers handle Darwin separately.)
+pm_install() {
+	pkg="$1"
+	sudo=""
+	[ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && sudo="sudo"
+	if command -v apt-get >/dev/null 2>&1; then
+		$sudo apt-get update -qq && $sudo apt-get install -y "$pkg"
+	elif command -v dnf >/dev/null 2>&1; then
+		$sudo dnf install -y "$pkg"
+	elif command -v yum >/dev/null 2>&1; then
+		$sudo yum install -y "$pkg"
+	elif command -v pacman >/dev/null 2>&1; then
+		$sudo pacman -S --noconfirm "$pkg"
+	elif command -v apk >/dev/null 2>&1; then
+		$sudo apk add "$pkg"
+	else
+		return 1
+	fi
+}
+
 # --- git (prerequisite for chezmoi and the clones below; not a mise tool) ---
 # chezmoi's built-in git can clone the source repo on a machine with no system
 # git, so this can run first and install real git before it's needed below.
@@ -17,22 +40,8 @@ if ! command -v git >/dev/null 2>&1; then
 	if [ "$(uname -s)" = "Darwin" ]; then
 		log "git not found — install the Command Line Tools: xcode-select --install"
 	else
-		sudo=""
-		[ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && sudo="sudo"
 		log "installing git"
-		if command -v apt-get >/dev/null 2>&1; then
-			$sudo apt-get update -qq && $sudo apt-get install -y git || log "git install failed"
-		elif command -v dnf >/dev/null 2>&1; then
-			$sudo dnf install -y git || log "git install failed"
-		elif command -v yum >/dev/null 2>&1; then
-			$sudo yum install -y git || log "git install failed"
-		elif command -v pacman >/dev/null 2>&1; then
-			$sudo pacman -S --noconfirm git || log "git install failed"
-		elif command -v apk >/dev/null 2>&1; then
-			$sudo apk add git || log "git install failed"
-		else
-			log "no known package manager; install git manually"
-		fi
+		pm_install git || log "git install failed (no known package manager?)"
 	fi
 fi
 
@@ -73,7 +82,18 @@ fi
 
 # --- fnm (Node version manager; not in mise's registry) ---
 if ! command -v fnm >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/fnm" ]; then
-	log "installing fnm"
-	curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "$HOME/.local/bin" --skip-shell \
-		|| log "fnm install failed"
+	# fnm's official installer is a bash script (arrays, [[ ]]), so /bin/sh
+	# can't run it. Minimal images (e.g. Alpine) ship only sh — ensure bash
+	# first so Node provisioning isn't silently skipped there.
+	if ! command -v bash >/dev/null 2>&1; then
+		log "bash not found (fnm's installer requires it) — installing bash"
+		pm_install bash || log "bash install failed"
+	fi
+	if command -v bash >/dev/null 2>&1; then
+		log "installing fnm"
+		curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "$HOME/.local/bin" --skip-shell \
+			|| log "fnm install failed"
+	else
+		log "bash unavailable; skipping fnm (install bash, then re-run apply)"
+	fi
 fi

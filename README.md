@@ -22,6 +22,8 @@ One static binary, no dependencies — works on a stock Mac or a bare server ima
 curl -fsSL https://raw.githubusercontent.com/mikevalstar/myplace/main/install.sh | sh
 ```
 
+The installer (and `self-update`) verifies the downloaded archive against the release's `checksums.txt` before installing it.
+
 Or build from source: `go build -o ~/.local/bin/myplace ./cmd/myplace` (or `mise run build`). Later, `myplace self-update` swaps in the newest release.
 
 ## Boot a new machine

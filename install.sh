@@ -20,14 +20,30 @@ case "$arch" in
   *) echo "unsupported architecture: $arch" >&2; exit 1 ;;
 esac
 
-url="https://github.com/$REPO/releases/latest/download/myplace_${os}_${arch}.tar.gz"
+archive="myplace_${os}_${arch}.tar.gz"
+base="https://github.com/$REPO/releases/latest/download"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-echo "downloading $url ..."
-curl -fsSL "$url" -o "$tmp/myplace.tar.gz"
-# TODO: verify against checksums.txt from the same release
-tar -xzf "$tmp/myplace.tar.gz" -C "$tmp" myplace
+echo "downloading $base/$archive ..."
+curl -fsSL "$base/$archive" -o "$tmp/$archive"
+
+# Verify the archive against checksums.txt from the same release before
+# extracting — TLS trust alone shouldn't gate a binary we're about to run.
+echo "verifying checksum ..."
+curl -fsSL "$base/checksums.txt" -o "$tmp/checksums.txt"
+expected=$(awk -v f="$archive" '$2 == f {print $1}' "$tmp/checksums.txt")
+[ -n "$expected" ] || { echo "no checksum for $archive in checksums.txt" >&2; exit 1; }
+if command -v sha256sum >/dev/null 2>&1; then
+  actual=$(sha256sum "$tmp/$archive" | awk '{print $1}')
+elif command -v shasum >/dev/null 2>&1; then
+  actual=$(shasum -a 256 "$tmp/$archive" | awk '{print $1}')
+else
+  echo "no sha256 tool found (need sha256sum or shasum)" >&2; exit 1
+fi
+[ "$expected" = "$actual" ] || { echo "checksum mismatch: expected $expected, got $actual" >&2; exit 1; }
+
+tar -xzf "$tmp/$archive" -C "$tmp" myplace
 
 mkdir -p "$BIN_DIR"
 install -m 0755 "$tmp/myplace" "$BIN_DIR/myplace"
