@@ -94,13 +94,13 @@ So `myplace outdated --json; echo $?` tells an agent "is anything upgradable her
 
 ## Acceptance criteria
 
-- [ ] `myplace outdated --json | jq .` succeeds; exactly one document on stdout; contains `schema`, `machine`, `checked_at`, `sources[]`.
-- [ ] On a Mac with brew present, the `brew` source is `available: true` and lists outdated formulae and casks; on a machine without brew it's `available: false` with empty packages and is not an error.
-- [ ] Exit code is `1` when anything is outdated, `0` when nothing is, `3` when no source could be queried.
-- [ ] `myplace status --json` verdict and exit code are **unchanged** by brew/unmanaged packages being outdated (proves the informational separation).
-- [ ] `myplace help --json`/`--llm` lists `outdated` with its exit codes and this doc as its output schema.
-- [ ] Dashboard shows the "Updates available" pane with per-source counts; `o` opens a scrollable detail view; `esc` returns.
-- [ ] Nothing in this feature ever installs or upgrades a package.
+- [x] `myplace outdated --json | jq .` succeeds; exactly one document on stdout; contains `schema`, `machine`, `checked_at`, `sources[]`.
+- [x] On a Mac with brew present, the `brew` source is `available: true` and lists outdated formulae and casks; on a machine without brew it's `available: false` with empty packages and is not an error.
+- [x] Exit code is `1` when anything is outdated, `0` when nothing is, `3` when no source could be queried.
+- [x] `myplace status --json` verdict and exit code are **unchanged** by brew/unmanaged packages being outdated (proves the informational separation).
+- [x] `myplace help --json`/`--llm` lists `outdated` with its exit codes and this doc as its output schema.
+- [x] Dashboard shows the "Updates available" pane with per-source counts; `o` opens a scrollable detail view; `esc` returns.
+- [x] Nothing in this feature ever installs or upgrades a package.
 
 ## Open questions
 

@@ -32,7 +32,7 @@ All checks are read-only on the machine (the only network op is a git fetch into
 3. **Tool drift** (mise):
    - Missing: `mise ls --json` entries where `installed == false`.
    - Outdated vs config: `mise outdated --json`.
-   - mise itself outdated: `mise version` self-check.
+   - mise itself outdated: `mise version` self-check. *(🚧 not yet built — planned; drift currently checks only managed tools, not the `mise` binary's own version.)*
 4. **myplace itself** — compare running version against latest release (skipped when offline).
 5. **Aggregate** into a single report with an overall verdict: `in_sync` | `drifted` | `unknown` (some checks couldn't run) | `error`.
 
@@ -43,6 +43,7 @@ All checks are read-only on the machine (the only network op is a git fetch into
 
 ```json
 {
+  "schema": 1,
   "machine": "hostname",
   "profile": "server",
   "checked_at": "2026-06-12T20:00:00Z",
@@ -51,6 +52,7 @@ All checks are read-only on the machine (the only network op is a git fetch into
     "behind_origin": 2,
     "to_apply": ["dot_zshrc"],
     "local_modified": [],
+    "uncommitted_files": 0,
     "unpushed_commits": 0
   },
   "tools": {
@@ -60,6 +62,8 @@ All checks are read-only on the machine (the only network op is a git fetch into
   "myplace": {"current": "0.3.0", "latest": "0.4.0"}
 }
 ```
+
+The integer count fields under `dotfiles` and `myplace.latest` are `null` (not `0`) when the underlying check couldn't run — offline, or no upstream configured. Any non-`null` value in `uncommitted_files` or `unpushed_commits` is outgoing drift and pushes the verdict to `drifted`. A degraded run also carries a top-level `"errors": []` string array (omitted when empty) and reports `verdict: "unknown"`. The envelope (`schema`, stream discipline, exit codes) is owned by the [headless CLI spec](../features/headless-cli-and-json-output.md).
 
 ## Outcome
 

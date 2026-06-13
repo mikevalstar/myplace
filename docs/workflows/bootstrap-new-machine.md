@@ -25,15 +25,15 @@ Git is *not* a hard precondition: chezmoi bundles a built-in git sufficient for 
 ## Steps
 
 1. **User runs `myplace`.** No chezmoi state is found (`chezmoi source-path` fails), so the TUI offers the bootstrap wizard instead of the dashboard. (`myplace bootstrap` jumps straight here.)
-2. **Detect the environment.** OS, arch, hostname, and which of chezmoi/mise/git are already present and at what versions. Display as a checklist.
+2. **Detect the environment. (🚧 not yet built — planned.)** OS, arch, hostname, and which of chezmoi/mise/git are already present and at what versions, displayed as a checklist. Today bootstrap detects only whether chezmoi/mise are installed (and installs them if missing); it shows no version checklist.
 3. **Install missing prerequisites.** With user confirmation, install via the official installers into `~/.local/bin`:
    - chezmoi: `sh -c "$(curl -fsLS get.chezmoi.io)" -- -b ~/.local/bin`
    - mise: `curl https://mise.run | sh`
    - No Homebrew dependency: servers won't have it, and the wizard must work the same everywhere. Brew-managed apps belong to the dotfiles' own run-once scripts, not to myplace.
 4. **Collect machine identity** (huh form): dotfiles repo URL, machine profile (`personal-mac` / `work-mac` / `server`), and any prompts the dotfiles templates need. Profile answers are written to chezmoi's data (`~/.config/chezmoi/chezmoi.toml`) so templates can branch on them — profiles share by default; differences are the exception.
-5. **Apply dotfiles:** `chezmoi init --apply <repo-url>`. Run via `tea.ExecProcess` (it may prompt or invoke askpass). The TUI shows `chezmoi diff` output for review before the apply when running interactively.
+5. **Apply dotfiles:** `chezmoi init --apply <repo-url>`. *(🚧 The planned `tea.ExecProcess` hand-off — so chezmoi can prompt or invoke askpass — and the `chezmoi diff` review-before-apply step are **not yet built**: today bootstrap runs `chezmoi init --apply` directly with no pre-apply diff. The diff review is the same "per-file diff review before apply" tracked as not-yet-built in CLAUDE.md.)*
 6. **Install tools:** `mise trust` on the now-present global config, then `mise install`. Stream progress; tool count and failures surface in the UI.
-7. **Run the dotfiles' own setup scripts** — chezmoi `run_once_` scripts fire during step 5 automatically; the TUI surfaces their output rather than hiding it.
+7. **Run the dotfiles' own setup scripts** — chezmoi `run_once_`/`run_onchange_` scripts fire during step 5's apply automatically. *(🚧 Surfacing their output in the TUI rather than folding it into the apply stream is **not yet built**.)*
 8. **Verify:** run the [status workflow](check-machine-status.md) and show the resulting dashboard. Offer "register this machine" hook here in phase 2.
 
 Branch: if chezmoi state already exists, the wizard short-circuits to the [update workflow](update-machine.md) with a "this machine is already set up" notice.
@@ -49,7 +49,7 @@ Dotfiles applied, tools installed at pinned versions, machine profile recorded i
 | No network / installer URL unreachable | step fails immediately with the curl error | retry; wizard resumes at the failed step |
 | Repo is SSH-only but no SSH keys exist yet (chicken-and-egg) | clone fails with auth error | wizard offers HTTPS clone instead; `chezmoi init` can re-point origin to SSH later once keys are applied |
 | Private repo over HTTPS needs a token | git credential prompt | `tea.ExecProcess` hands the terminal over so the prompt works |
-| `chezmoi apply` would overwrite existing local files | chezmoi reports conflict | show diff, let user choose keep/overwrite per file |
+| `chezmoi apply` would overwrite existing local files | chezmoi reports conflict | 🚧 planned: show diff, let user choose keep/overwrite per file (per-file diff review, not yet built) |
 | A `mise install` target fails to build/download | per-tool failure list at end of step 6 | continue with the rest; failed tools listed in status as missing |
 | Wizard interrupted partway | next `myplace` run re-detects state | every step is idempotent re-runnable; wizard resumes from detection, not a saved cursor |
 

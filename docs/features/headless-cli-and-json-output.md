@@ -43,7 +43,7 @@ The same person is both audiences: at a Mac, you want the TUI; across twelve ser
 | `myplace status` | human-readable summary (plain text, no TUI) | `--json` |
 | `myplace outdated` | per-source list of upgradable packages (plain text) | `--json` — informational; own exit codes (see below) |
 | `myplace update` | TUI review-and-apply flow | `--yes [--dotfiles] [--tools]`, plus `--json` for the result report |
-| `myplace self-update` | confirm prompt | `--yes`, `--json` |
+| `myplace self-update` | runs unattended (no prompt) | `--json` |
 | `myplace version` | plain text | `--json` |
 | `myplace help` | cobra help (opens with an agent pointer) | `--llm` brief, `--json` manifest — see [LLM-friendly help](llm-friendly-help.md) |
 
@@ -83,7 +83,7 @@ $ myplace status --json
   "profile": "server",
   "checked_at": "2026-06-12T20:00:00Z",
   "verdict": "drifted",
-  "dotfiles": { "behind_origin": 2, "to_apply": ["dot_zshrc"], "local_modified": [], "unpushed_commits": 0 },
+  "dotfiles": { "behind_origin": 2, "to_apply": ["dot_zshrc"], "local_modified": [], "uncommitted_files": 0, "unpushed_commits": 0 },
   "tools": { "missing": [], "outdated": [{ "name": "node", "current": "22.1.0", "wanted": "22.3.0" }] },
   "myplace": { "current": "0.3.0", "latest": "0.4.0" }
 }
@@ -91,16 +91,18 @@ $ echo $?
 1
 ```
 
+The integer count fields under `dotfiles` (`behind_origin`, `uncommitted_files`, `unpushed_commits`) are **nullable**: they are `null` when the check couldn't run (offline, or no upstream configured), not `0`. `myplace.latest` is `null` when the release check was skipped (offline). On a degraded run a top-level `"errors": [...]` array of strings appears alongside the report (omitted when empty) and the verdict is `unknown`.
+
 Full field semantics live in the [status workflow](../workflows/check-machine-status.md); this document owns the envelope (`schema`, stream discipline, exit codes), the workflow owns the drift semantics.
 
 ## Acceptance criteria
 
-- [ ] `myplace status --json | jq .` succeeds; nothing but the document on stdout, even with verbose logging enabled.
-- [ ] Exit codes match the table for in-sync, drifted, offline-unknown, and broken-install cases.
-- [ ] `myplace bootstrap --repo <url> --profile server --yes` completes on a fresh Linux container with no TTY attached.
-- [ ] A headless `update` hitting a conflict exits 3 with an error naming the interactive flow, rather than hanging.
-- [ ] Every JSON document contains `schema: 1`.
-- [ ] Core packages (`internal/...`) contain no TUI imports (enforces the architecture in ADR-0002).
+- [x] `myplace status --json | jq .` succeeds; nothing but the document on stdout, even with verbose logging enabled.
+- [x] Exit codes match the table for in-sync, drifted, offline-unknown, and broken-install cases.
+- [x] `myplace bootstrap --repo <url> --profile server --yes` completes on a fresh Linux container with no TTY attached.
+- [x] A headless `update` hitting a conflict exits 3 with an error naming the interactive flow, rather than hanging.
+- [x] Every JSON document contains `schema: 1`.
+- [x] Core packages (`internal/...`) contain no TUI imports (enforces the architecture in ADR-0002).
 
 ## Decisions made during implementation
 

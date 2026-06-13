@@ -42,7 +42,7 @@ func newStatusCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 			annHeadless:     "myplace status --json",
 			annExitCodes:    exitCodesDrift,
 			annOutputSchema: "docs/features/headless-cli-and-json-output.md",
-			annInteractive:  "true",
+			annInteractive:  "false",
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			rep := drift.Compute(cmd.Context(), ch, ms, version.Version)

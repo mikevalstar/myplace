@@ -73,14 +73,14 @@ A 1-second `tea.Tick` reloads the tail of `myplace.log` into the Activity pane �
 
 ## Acceptance criteria
 
-- [ ] Dashboard fills the terminal and re-tiles on resize without overflow or wrapped borders.
-- [ ] Dotfiles, Tools, and Updates-available panes sit side by side; Activity spans full width below.
-- [ ] The Updates pane shows per-source counts after the inventory loads (and `checking…` before), without changing the verdict badge.
-- [ ] `o` opens a scrollable outdated detail view grouped by source; `esc`/`q` returns to the dashboard.
-- [ ] Activity shows recent `myplace.log` lines and updates roughly every second.
-- [ ] Long file paths/tool lines are ellipsized; overlong lists show "+N more".
-- [ ] Tiny terminals render a readable fallback, not garbage.
-- [ ] No network/status recompute happens on the activity tick.
+- [x] Dashboard fills the terminal and re-tiles on resize without overflow or wrapped borders.
+- [x] Dotfiles, Tools, and Updates-available panes sit side by side; Activity spans full width below.
+- [x] The Updates pane shows per-source counts after the inventory loads (and `checking…` before), without changing the verdict badge.
+- [x] `o` opens a scrollable outdated detail view grouped by source; `esc`/`q` returns to the dashboard.
+- [x] Activity shows recent `myplace.log` lines and updates roughly every second.
+- [x] Long file paths/tool lines are ellipsized; overlong lists show "+N more".
+- [x] Tiny terminals render a readable fallback, not garbage.
+- [x] No network/status recompute happens on the activity tick.
 
 ## Related
 

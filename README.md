@@ -42,6 +42,8 @@ For servers, skip the wizard entirely:
 myplace bootstrap --profile server --yes
 ```
 
+`bootstrap` also takes `--repo <url>` (the dotfiles repo, defaults to this one) and `--git-name` / `--git-email` to seed this machine's git identity non-interactively — handy in an unattended image build.
+
 Details and failure handling: [bootstrap workflow](docs/workflows/bootstrap-new-machine.md).
 
 ## Everyday use
@@ -52,7 +54,10 @@ myplace update       # capture local edits (keep/discard/skip per file), pull + 
 myplace status       # quick plain-text summary, no TUI
 myplace outdated     # what's upgradable across package managers (mise + brew), read-only
 myplace self-update  # swap this binary for the latest release
+myplace version      # print the version (add --json for a machine-readable document)
 ```
+
+Narrow an update to one half with `myplace update --dotfiles` (pull + apply only) or `myplace update --tools` (install + upgrade only); bare `myplace update` does both.
 
 "In sync" is bidirectional: repo changes you haven't applied **and** local edits you haven't pushed both count as drift. Updating always shows you the diff before touching anything.
 

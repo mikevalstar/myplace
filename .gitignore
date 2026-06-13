@@ -9,3 +9,6 @@
 # Local-only Claude settings
 .claude/settings.local.json
 bin/
+
+# Local build of the binary (release builds are CI-only)
+/myplace

@@ -63,12 +63,12 @@ Logs go to the file (and the file only); stdout stays reserved for the single JS
 
 ## Acceptance criteria
 
-- [ ] After any command, `<state-dir>/myplace.log` exists and contains one line per chezmoi/mise invocation with duration and outcome.
-- [ ] `myplace status --json | jq .` still succeeds with logging enabled (stdout unpolluted).
-- [ ] `MYPLACE_STATE_DIR=/tmp/x myplace status` writes to `/tmp/x/myplace.log`.
-- [ ] A failed subprocess produces an `error`-level line with stderr context.
-- [ ] An unwritable state dir does not fail the command.
-- [ ] The log file is bounded (rotation verified past the threshold).
+- [x] After any command, `<state-dir>/myplace.log` exists and contains one line per chezmoi/mise invocation with duration and outcome.
+- [x] `myplace status --json | jq .` still succeeds with logging enabled (stdout unpolluted).
+- [x] `MYPLACE_STATE_DIR=/tmp/x myplace status` writes to `/tmp/x/myplace.log`.
+- [x] A failed subprocess produces an `error`-level line with stderr context.
+- [x] An unwritable state dir does not fail the command.
+- [x] The log file is bounded (rotation verified past the threshold).
 
 ## Open questions
 
