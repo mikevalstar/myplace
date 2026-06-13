@@ -68,6 +68,20 @@ When the request is to change the **machine setup** — a mise tool, a dotfile, 
   4. `myplace status` — confirm it's back to in sync (exit `0`).
 - **Don't run `update`/`bootstrap` just to test the app** — they mutate this real machine. Exercise app behavior with `status`, `help`, and the Go tests instead.
 
+## Cutting a release
+
+Releases are **tag-driven** — pushing a `vX.Y.Z` tag *is* the release. The `release.yml` Action runs goreleaser, which cross-compiles the darwin/linux × amd64/arm64 matrix, builds the archives + `checksums.txt`, and publishes the GitHub Release. **Never build or upload artifacts by hand** — the tag is the trigger and CI does the rest (pipeline internals and the version-less archive URL that `install.sh`/`self-update` depend on: [ADR-0004](docs/adrs/0004-release-pipeline-goreleaser.md)).
+
+The version is **injected from the tag** via ldflags; `internal/version/version.go` only holds an `X.Y.Z-dev` fallback for local/non-release builds, so the released binary reports the clean tag (`myplace version`). Bump semver-style: new capability → minor, fix → patch, breaking change → major.
+
+The ritual (matches the existing tag history — e.g. `git log -- internal/version/version.go`):
+
+1. Land the change on `main` with **green CI** (`ci.yml` runs `go test`/`vet`/`gofmt` on every push — a release tag should never be the first time code builds in CI).
+2. Bump `internal/version/version.go` to the version you're about to tag with the `-dev` suffix, in its own commit: `Bump dev version to X.Y.Z-dev for the vX.Y.Z release`.
+3. Push `main`.
+4. Create an **annotated** tag — `git tag -a vX.Y.Z -m "vX.Y.Z — <headline>"` — then `git push origin vX.Y.Z`. The tag push is the outward step, so confirm first per the usual rules.
+5. Confirm the release run is green (`gh run watch`) and goreleaser published the release + assets. `install.sh` and `self-update` then serve the new tag automatically; `status` flags machines on an older binary.
+
 ## Project state
 
 v0 implemented and verified end-to-end: `bootstrap` (wizard + headless), `status` (TUI dashboard + `--json`, spec'd exit codes, includes outdated-binary check), `outdated` (cross–package-manager inventory — mise + brew-if-present — TUI pane + `o` detail view + `--json`; informational, never affects the drift verdict, ADR-0010), `update` (interactive: per-file capture of local edits then converge; headless: converge-only), `self-update` (GitHub releases), `help --llm`/`--json` (self-describing agent manifest + brief generated from the cobra tree; per-command facts live in cobra `Annotations`, enforced by `cmd/myplace/help_test.go`). Persistent debug log to `$XDG_STATE_HOME/myplace/myplace.log` (ADR-0005, logging feature spec). Releases: tag `v*` → goreleaser via Actions (ADR-0004); `install.sh` at repo root is the installer. Not yet built: per-file diff review before apply, `push: false` profile policy, phase-2 server.
