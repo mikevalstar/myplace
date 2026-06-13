@@ -1,10 +1,16 @@
 {{/* Machine identity, collected once on `chezmoi init` and stored in ~/.config/chezmoi/chezmoi.toml */}}
-{{/* prompt key is "profile" so headless init can pass: --promptChoice profile=server */}}
+{{/* Headless/agent init can pre-answer the prompts, e.g.:
+     --promptChoice profile=server --promptString gitEmail=you@work.com */}}
 {{- $profile := promptChoiceOnce . "profile" "profile" (list "personal-mac" "work-mac" "server") -}}
+{{- $gitName := promptStringOnce . "gitName" "Git name" "Mike Valstar" -}}
+{{- $gitEmail := promptStringOnce . "gitEmail" "Git email" "mike@valstar.dev" -}}
 
 [data]
     profile = {{ $profile | quote }}
-    # Machines share by default; per-machine differences branch on .profile in templates.
+    gitName = {{ $gitName | quote }}
+    gitEmail = {{ $gitEmail | quote }}
+    # Machines share by default; per-machine differences (e.g. a work email)
+    # are answered at install time, not branched in templates.
 
 [git]
     autoCommit = false

@@ -22,9 +22,11 @@ const defaultRepo = "https://github.com/mikevalstar/myplace.git"
 var profiles = []string{"personal-mac", "work-mac", "server"}
 
 type bootstrapOpts struct {
-	repo    string
-	profile string
-	yes     bool
+	repo     string
+	profile  string
+	yes      bool
+	gitName  string
+	gitEmail string
 }
 
 func newBootstrapCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
@@ -38,6 +40,8 @@ func newBootstrapCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.repo, "repo", defaultRepo, "dotfiles repo (this repo, or a fork)")
 	cmd.Flags().StringVar(&opts.profile, "profile", "", "machine profile: personal-mac, work-mac, or server")
+	cmd.Flags().StringVar(&opts.gitName, "git-name", "", "git user.name (blank = repo default)")
+	cmd.Flags().StringVar(&opts.gitEmail, "git-email", "", "git user.email (blank = repo default; e.g. set a work email here)")
 	cmd.Flags().BoolVar(&opts.yes, "yes", false, "run without prompts (requires --profile)")
 	return cmd
 }
@@ -71,6 +75,8 @@ func runBootstrap(cmd *cobra.Command, ch *chezmoi.Client, ms *mise.Client, opts 
 			huh.NewInput().Title("Dotfiles repo").Value(&opts.repo),
 			huh.NewSelect[string]().Title("Machine profile").
 				Options(huh.NewOptions(profiles...)...).Value(&opts.profile),
+			huh.NewInput().Title("Git name").Description("blank = repo default").Value(&opts.gitName),
+			huh.NewInput().Title("Git email").Description("blank = repo default; set a work email here on the work mac").Value(&opts.gitEmail),
 			huh.NewConfirm().Title("Install chezmoi + mise (if missing), apply dotfiles, install tools?").
 				Value(&confirm),
 		))
@@ -103,7 +109,8 @@ func runBootstrap(cmd *cobra.Command, ch *chezmoi.Client, ms *mise.Client, opts 
 	}
 
 	progress("applying dotfiles from %s (profile: %s) ...", opts.repo, opts.profile)
-	if err := ch.InitApply(ctx, opts.repo, opts.profile); err != nil {
+	prompts := map[string]string{"gitName": opts.gitName, "gitEmail": opts.gitEmail}
+	if err := ch.InitApply(ctx, opts.repo, opts.profile, prompts); err != nil {
 		return fmt.Errorf("chezmoi init: %w", err)
 	}
 

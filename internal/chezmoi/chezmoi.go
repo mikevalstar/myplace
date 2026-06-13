@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -178,14 +179,30 @@ func (c *Client) Push(ctx context.Context) error {
 	return err
 }
 
-// InitApply runs first-time setup: clone the repo, answer the profile
-// prompt non-interactively, and apply.
-func (c *Client) InitApply(ctx context.Context, repo, profile string) error {
+// InitApply runs first-time setup: clone the repo, answer the init prompts
+// non-interactively, and apply. profile is the machine profile; promptStrings
+// pre-answers any promptStringOnce values (e.g. gitEmail) so init never blocks.
+func (c *Client) InitApply(ctx context.Context, repo, profile string, promptStrings map[string]string) error {
 	args := []string{"init", "--apply"}
 	if profile != "" {
 		args = append(args, "--promptChoice", "profile="+profile)
 	}
+	// Sorted for a stable command line (logs/tests).
+	for _, k := range sortedKeys(promptStrings) {
+		if promptStrings[k] != "" {
+			args = append(args, "--promptString", k+"="+promptStrings[k])
+		}
+	}
 	args = append(args, repo)
 	_, err := c.cz(ctx, args...)
 	return err
+}
+
+func sortedKeys(m map[string]string) []string {
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	return ks
 }

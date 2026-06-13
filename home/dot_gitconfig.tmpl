@@ -1,0 +1,7 @@
+# Managed by myplace (chezmoi). Identity is collected at install time
+# (myplace bootstrap / chezmoi init) and stored in chezmoi's data — change it
+# by re-running bootstrap with --git-email/--git-name, or editing the [data]
+# block in ~/.config/chezmoi/chezmoi.toml. (dig falls back to the repo default.)
+[user]
+	name = {{ dig "gitName" "Mike Valstar" . }}
+	email = {{ dig "gitEmail" "mike@valstar.dev" . }}

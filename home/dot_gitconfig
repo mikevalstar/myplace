@@ -1,6 +1,0 @@
-# Managed by myplace (chezmoi). Edit in the repo (home/dot_gitconfig).
-# Same identity on personal machines and servers. If the work mac ever needs a
-# different email, rename this to dot_gitconfig.tmpl and branch on .profile.
-[user]
-	name = Mike Valstar
-	email = mike@valstar.dev
