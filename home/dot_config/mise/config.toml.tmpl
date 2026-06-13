@@ -1,15 +1,22 @@
 # Global tool set for every myplace-managed machine.
 # Managed by chezmoi from the myplace repo — edit there, not here.
+#
+# Note: Rust is installed via rustup and Node via fnm (see ADR-0007 and
+# home/.chezmoiscripts/run_onchange_provision.sh), so neither is managed here.
 
 [tools]
-# Shared baseline: keep this list small and universal.
+# CLI baseline — installed on every machine, servers included.
 jq = "latest"
 ripgrep = "latest"
+fd = "latest"
+bat = "latest"
+fzf = "latest"
+eza = "latest"
+zoxide = "latest"
+starship = "latest"
+atuin = "latest"
 gum = "latest"
-{{ if ne .profile "server" -}}
-# Workstation-only tools (personal-mac, work-mac)
-node = "lts"
-{{- end }}
+pnpm = "latest"
 
 [settings]
 experimental = false

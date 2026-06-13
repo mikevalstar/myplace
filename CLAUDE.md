@@ -52,6 +52,7 @@ This repo is simultaneously the app, the chezmoi source repo, and the mise confi
 - `mise.toml` at the root is dev tooling for **this repo only** (Go toolchain, build/test tasks) — don't confuse the two
 - `cmd/`, `internal/` — the Go app; `internal/{run,chezmoi,mise,drift}` must never import TUI packages
 - Machine-local state (logs now, caches later) lives under `$XDG_STATE_HOME/myplace` (ADR-0005), **never** `~/.config` — that's chezmoi's tree. Every external command is logged via the `run.Runner` choke point.
+- **Provisioning split (ADR-0007):** mise installs registry CLI tools (in `home/dot_config/mise/config.toml.tmpl`); `home/.chezmoiscripts/run_onchange_provision.sh` installs what mise can't — oh-my-zsh + plugins, rustup, fnm. **Node is fnm's and Rust is rustup's — never add them to mise.** Adding a tool/dotfile? See `docs/guides/managed-setup.md`.
 
 ## Project state
 
