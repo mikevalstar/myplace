@@ -42,6 +42,7 @@ Decided but not all spec'd yet — write the feature/workflow doc before buildin
 - **Headless `--json` from day one**: every capability works as a plain CLI command with `--json` output. Phase 2's server reporting builds on this, so never weld logic to the TUI layer.
 - **Machine profiles share by default**: personal Macs, work Mac, and servers are profiles over one common setup; per-machine differences are the exception, handled via chezmoi templates/data.
 - **Status is bidirectional**: "in sync" means no drift in *either* direction — local changes not pushed to the dotfiles repo, and repo/tool updates not yet applied locally both count as out of sync.
+- **Every command is agent-runnable** (ADR-0006): each command must have a fully non-interactive path (flags + `--yes` + `--json`); off a TTY with a needed decision unsupplied, it fails fast (exit 3) naming the flag rather than prompting or hanging. No subprocess may grab the terminal. A new command isn't done until a script can drive it without a human.
 
 ## Monorepo layout (ADR-0003)
 

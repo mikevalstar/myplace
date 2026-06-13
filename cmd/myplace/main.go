@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mikevalstar/myplace/internal/chezmoi"
+	"github.com/mikevalstar/myplace/internal/drift"
 	"github.com/mikevalstar/myplace/internal/logging"
 	"github.com/mikevalstar/myplace/internal/mise"
 	"github.com/mikevalstar/myplace/internal/run"
@@ -58,6 +59,16 @@ func main() {
 				}
 				// Fresh machine + a human present: route to the wizard.
 				return runBootstrap(cmd, ch, ms, bootstrapOpts{})
+			}
+			// The dashboard needs a TTY. Off one (an agent or pipe ran bare
+			// `myplace`), don't error on a missing terminal — fall back to the
+			// read-only status summary, which is the useful no-arg answer.
+			// (ADR-0006: every command path is agent-runnable.)
+			if !interactive() {
+				rep := drift.Compute(ctx, ch, ms, version.Version)
+				logger.Info("status (bare, non-interactive)", "verdict", rep.Verdict)
+				fmt.Print(renderStatusText(rep))
+				os.Exit(drift.ExitCode(rep.Verdict))
 			}
 			return tui.Run(ch, ms, version.Version)
 		},
