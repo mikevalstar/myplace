@@ -53,6 +53,14 @@ myplace self-update  # swap this binary for the latest release
 
 "In sync" is bidirectional: repo changes you haven't applied **and** local edits you haven't pushed both count as drift. Updating always shows you the diff before touching anything.
 
+## Logs
+
+Every run appends a full debug trace — each chezmoi/mise command with its arguments, duration, and outcome, plus the run's verdict — to `~/.local/state/myplace/myplace.log` (honoring `XDG_STATE_HOME`; override with `MYPLACE_STATE_DIR`). It's deliberately outside `~/.config` so it never lands in your dotfiles. The file self-rotates past ~5 MB. Tail it when something misbehaves on a machine you'll next see in three weeks:
+
+```sh
+tail -f ~/.local/state/myplace/myplace.log
+```
+
 ## Scripting and JSON
 
 Every data-producing command takes `--json`: stdout is exactly one JSON document (logs go to stderr), and exit codes tell you the verdict without parsing — `0` in sync, `1` drifted, `2` unknown (e.g. offline), `3` error.

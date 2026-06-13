@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // Runner executes an external command and returns its stdout.
@@ -16,10 +17,28 @@ type Runner interface {
 	Run(ctx context.Context, dir string, name string, args ...string) ([]byte, error)
 }
 
-// Exec is the real implementation.
-type Exec struct{}
+// Logger is the minimal slice of charmbracelet/log the runner needs, kept as
+// an interface so this package doesn't depend on the logging library.
+type Logger interface {
+	Debug(msg interface{}, keyvals ...interface{})
+	Error(msg interface{}, keyvals ...interface{})
+}
 
-func (Exec) Run(ctx context.Context, dir string, name string, args ...string) ([]byte, error) {
+// Exec is the real implementation. Log is optional; when set, every command
+// is recorded with its duration and outcome (the high-value debug trace).
+type Exec struct {
+	Log    Logger
+	tailFn func(string) string
+}
+
+// WithLogger returns an Exec that records every invocation. tail trims stderr
+// captured into the failure line (pass logging.Tail).
+func WithLogger(l Logger, tail func(string) string) Exec {
+	return Exec{Log: l, tailFn: tail}
+}
+
+func (e Exec) Run(ctx context.Context, dir string, name string, args ...string) ([]byte, error) {
+	start := time.Now()
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	// Closed stdin (not the inherited terminal): a child that tries to prompt
@@ -29,7 +48,20 @@ func (Exec) Run(ctx context.Context, dir string, name string, args ...string) ([
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	err := cmd.Run()
+	dur := time.Since(start).Round(time.Millisecond)
+
+	if e.Log != nil {
+		joined := strings.Join(args, " ")
+		if err != nil {
+			e.Log.Error("exec failed", "tool", name, "args", joined, "dir", dir,
+				"dur", dur.String(), "stderr", e.tail(stderr.String()))
+		} else {
+			e.Log.Debug("exec", "tool", name, "args", joined, "dir", dir, "dur", dur.String())
+		}
+	}
+
+	if err != nil {
 		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {
 			msg = err.Error()
@@ -37,4 +69,11 @@ func (Exec) Run(ctx context.Context, dir string, name string, args ...string) ([
 		return stdout.Bytes(), fmt.Errorf("%s %s: %s", name, strings.Join(args, " "), msg)
 	}
 	return stdout.Bytes(), nil
+}
+
+func (e Exec) tail(s string) string {
+	if e.tailFn != nil {
+		return e.tailFn(s)
+	}
+	return strings.TrimSpace(s)
 }

@@ -76,6 +76,9 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 				res := stepResult{Name: name, OK: err == nil}
 				if err != nil {
 					res.Error = err.Error()
+					logger.Error("update step failed", "step", name, "err", err.Error())
+				} else {
+					logger.Info("update step ok", "step", name)
 				}
 				if !jsonOut {
 					mark := "ok"

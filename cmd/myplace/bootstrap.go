@@ -10,6 +10,7 @@ import (
 
 	"github.com/mikevalstar/myplace/internal/chezmoi"
 	"github.com/mikevalstar/myplace/internal/drift"
+	"github.com/mikevalstar/myplace/internal/logging"
 	"github.com/mikevalstar/myplace/internal/mise"
 	"github.com/mikevalstar/myplace/internal/run"
 	"github.com/mikevalstar/myplace/internal/version"
@@ -82,8 +83,11 @@ func runBootstrap(cmd *cobra.Command, ch *chezmoi.Client, ms *mise.Client, opts 
 		}
 	}
 
-	r := run.Exec{}
-	progress := func(format string, a ...any) { fmt.Fprintf(os.Stderr, format+"\n", a...) }
+	r := run.WithLogger(logger, logging.Tail)
+	progress := func(format string, a ...any) {
+		logger.Info("bootstrap", "step", fmt.Sprintf(format, a...))
+		fmt.Fprintf(os.Stderr, format+"\n", a...)
+	}
 
 	if !ch.Installed(ctx) {
 		progress("installing chezmoi → ~/.local/bin ...")
@@ -115,6 +119,7 @@ func runBootstrap(cmd *cobra.Command, ch *chezmoi.Client, ms *mise.Client, opts 
 	rep := drift.Compute(ctx, ch, ms, version.Version)
 	fmt.Print(renderStatusText(rep))
 	progress("\nbootstrap complete — open a new shell, then run `myplace` for the dashboard")
+	fmt.Fprintf(os.Stderr, "logs: %s\n", logging.Path())
 	os.Exit(drift.ExitCode(rep.Verdict))
 	return nil
 }

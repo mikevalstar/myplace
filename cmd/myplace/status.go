@@ -40,6 +40,9 @@ func newStatusCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 			"Exit codes: 0 in sync, 1 drifted, 2 unknown, 3 error.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			rep := drift.Compute(cmd.Context(), ch, ms, version.Version)
+			logger.Info("status", "verdict", rep.Verdict,
+				"to_apply", len(rep.Dotfiles.ToApply), "local_modified", len(rep.Dotfiles.LocalModified),
+				"tools_missing", len(rep.Tools.Missing), "tools_outdated", len(rep.Tools.Outdated))
 			if jsonOut {
 				emitJSON(rep)
 			} else {

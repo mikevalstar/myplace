@@ -4,15 +4,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	charmlog "github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 
 	"github.com/mikevalstar/myplace/internal/chezmoi"
+	"github.com/mikevalstar/myplace/internal/logging"
 	"github.com/mikevalstar/myplace/internal/mise"
 	"github.com/mikevalstar/myplace/internal/run"
 	"github.com/mikevalstar/myplace/internal/tui"
 	"github.com/mikevalstar/myplace/internal/version"
 )
+
+// logger is set once in main and shared by all subcommands (same package) so
+// they can log outcomes without threading it through every constructor.
+var logger *charmlog.Logger
 
 func main() {
 	// Bootstrap installs into ~/.local/bin; make sure we can see binaries
@@ -21,7 +28,15 @@ func main() {
 		os.Setenv("PATH", filepath.Join(home, ".local", "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
 	}
 
-	r := run.Exec{}
+	// Persistent debug trace to <state-dir>/myplace.log (ADR-0005). Tag the
+	// session with the subcommand (best-effort from argv) so interleaved runs
+	// stay separable; lifecycle and every subprocess go to the file.
+	var closeLog func()
+	logger, closeLog = logging.New(subcommand(os.Args))
+	defer closeLog()
+	logger.Info("start", "version", version.Version, "argv", strings.Join(os.Args[1:], " "))
+
+	r := run.WithLogger(logger, logging.Tail)
 	ch := chezmoi.New(r)
 	ms := mise.New(r)
 
@@ -30,7 +45,8 @@ func main() {
 		Short: "Bootstrap, update, and check machines managed by chezmoi + mise",
 		Long: "myplace orchestrates chezmoi (dotfiles) and mise (tools) to bootstrap new\n" +
 			"machines, update existing ones, and report drift. Run with no arguments\n" +
-			"for the TUI dashboard; every subcommand also works headlessly (--json).",
+			"for the TUI dashboard; every subcommand also works headlessly (--json).\n\n" +
+			"Debug log: " + logging.Path(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -56,7 +72,20 @@ func main() {
 	)
 
 	if err := root.Execute(); err != nil {
+		logger.Error("exit with error", "err", err.Error())
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(3)
 	}
+	logger.Info("exit ok")
+}
+
+// subcommand returns the first non-flag argument (the cobra subcommand) for
+// log tagging, or "tui" when invoked bare.
+func subcommand(argv []string) string {
+	for _, a := range argv[1:] {
+		if !strings.HasPrefix(a, "-") {
+			return a
+		}
+	}
+	return "tui"
 }
