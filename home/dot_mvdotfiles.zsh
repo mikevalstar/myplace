@@ -1,30 +1,39 @@
+# MYPLACE_INTERACTIVE_SHELL is computed in .zshrc (1 = real terminal, 0 =
+# agent/CI shell). The prompt, history, cd-hooks and keybindings below are
+# interactive-only and their init chatter pollutes an agent's captured stdout,
+# so gate them. Default to 1 if unset (e.g. this file sourced standalone) so a
+# human shell never loses its tooling. See docs/guides/agent-friendly-shell.md.
+if [[ "${MYPLACE_INTERACTIVE_SHELL:-1}" == 1 ]]; then
+
 ## Starship
 if [[ -x "$(command -v starship)" ]]; then
     eval "$(starship init zsh)"
 else
-    echo "starship not found, and not setup"
+    echo "starship not found, and not setup" >&2
 fi
 
 ## zoxide setup for better cd
 if [[ -x "$(command -v zoxide)" ]]; then
     eval "$(zoxide init --cmd cd zsh)"
 else
-    echo "zoxide not found, and not setup"
+    echo "zoxide not found, and not setup" >&2
 fi
 
 ## atuin
 if [[ -x "$(command -v atuin)" ]]; then
     eval "$(atuin init zsh)"
 else
-    echo "atuin not found, and not setup"
+    echo "atuin not found, and not setup" >&2
 fi
 
 ## fzf
 if [[ -x "$(command -v fzf)" ]]; then
     source <(fzf --zsh)
 else
-    echo "fzf not found, and not setup"
+    echo "fzf not found, and not setup" >&2
 fi
+
+fi  # end interactive-only block
 
 ## add scripts folder to the path
 export PATH="$PATH:$HOME/.config/scripts"

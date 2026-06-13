@@ -10,6 +10,20 @@ plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
 
 # ---- user configuration ----
 
+# Real interactive terminal, or an agent/CI shell? Coding agents source this
+# rc to capture PATH, but their prompt/history/cd-hook/keybinding chatter
+# pollutes captured stdout (and zoxide's cd override can send them to the wrong
+# dir). Gate interactive-only tooling on this; leave PATH/runtime setup ungated
+# so agents still get mise/fnm/cargo. Env vars: CLAUDECODE+AI_AGENT (Claude
+# Code), CURSOR_AGENT (Cursor), CODEX_SANDBOX (Codex), OPENCODE (opencode, not
+# yet shipped — forward-compat). See docs/guides/agent-friendly-shell.md.
+if [[ -o interactive && -z "$CLAUDECODE$AI_AGENT$CURSOR_AGENT$CODEX_SANDBOX$OPENCODE" ]]; then
+  MYPLACE_INTERACTIVE_SHELL=1
+else
+  MYPLACE_INTERACTIVE_SHELL=0
+fi
+export MYPLACE_INTERACTIVE_SHELL
+
 # Local bin first on PATH (myplace, fnm, rustup, and friends install here).
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -19,8 +33,16 @@ command -v mise >/dev/null 2>&1 && eval "$(mise activate zsh)"
 # Personal shared dotfiles: tool inits, aliases, functions.
 [ -f "$HOME/.mvdotfiles.zsh" ] && source "$HOME/.mvdotfiles.zsh"
 
-# fnm (Node) — auto-switch versions on cd.
-command -v fnm >/dev/null 2>&1 && eval "$(fnm env --use-on-cd --shell zsh)"
+# fnm (Node). Always put Node on PATH; only add the per-cd auto-switch hook
+# for real terminals — under an agent/CI shell it prints "Using Node ..." on
+# every cd, contaminating captured output. See docs/guides/agent-friendly-shell.md.
+if command -v fnm >/dev/null 2>&1; then
+  if [[ "$MYPLACE_INTERACTIVE_SHELL" == 1 ]]; then
+    eval "$(fnm env --use-on-cd --shell zsh)"
+  else
+    eval "$(fnm env --shell zsh)"
+  fi
+fi
 
 # Rust / cargo (rustup).
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
