@@ -98,9 +98,11 @@ Full field semantics live in the [status workflow](../workflows/check-machine-st
 - [ ] Every JSON document contains `schema: 1`.
 - [ ] Core packages (`internal/...`) contain no TUI imports (enforces the architecture in ADR-0002).
 
-## Open questions
+## Decisions made during implementation
 
-- Does headless `update --yes` capture *outgoing* drift (auto `re-add` + push), or only apply incoming? Auto-pushing unreviewed local edits from cron feels wrong — current lean: headless update is incoming-only + tools, and outgoing capture stays interactive. Needs a decision before implementation.
+- **`update` is converge-only (both headless and TUI for now):** it applies incoming dotfiles and converges tools, but never auto-captures outgoing drift — pushing unreviewed local edits from cron is a footgun. Outgoing capture (re-add / commit / push with per-file review) will be an interactive flow, tracked in the update workflow doc.
+
+## Open questions
 - Should `--json` errors also be JSON on stdout (an error document) or plain text on stderr only? Lean: error document with `"verdict": "error"`, keeping stdout parseable always.
 
 ## Related

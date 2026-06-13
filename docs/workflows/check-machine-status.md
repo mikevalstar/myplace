@@ -1,6 +1,6 @@
 ---
 title: Check machine status
-status: draft
+status: active
 created: 2026-06-12
 updated: 2026-06-12
 tags: [status, drift, chezmoi, mise, json]

@@ -10,14 +10,17 @@ A TUI for getting machines from zero to fully-configured, and keeping them that 
 
 Target machines: personal Macs, a work Mac, and assorted Linux servers — one common setup, many hosts.
 
-> 🚧 **Design phase.** The commands below are the spec ([docs/](docs/README.md) is the source of truth); the binary doesn't exist yet. This README is kept current as the design and code evolve.
+This repo is a monorepo: the Go app, the chezmoi dotfiles (under [home/](home/), via `.chezmoiroot`), and the machines' mise config all live here — one clone carries everything ([ADR-0003](docs/adrs/0003-monorepo-app-dotfiles-mise.md)).
+
+> 🚧 **v0.** Bootstrap, status (TUI + `--json`), and converge-style update work. Not yet built: outgoing-drift capture (re-add/commit/push), per-file diff review, `self-update`, and the installer one-liner.
 
 ## Install
 
-One static binary, no dependencies — works on a stock Mac or a bare server image:
+Planned: one static binary via an installer one-liner (no dependencies — works on a stock Mac or bare server image). Until releases exist, build from source:
 
 ```sh
-curl -fsSL https://example.com/myplace/install.sh | sh   # URL TBD — lands in ~/.local/bin
+git clone https://github.com/mikevalstar/myplace.git && cd myplace
+go build -o ~/.local/bin/myplace ./cmd/myplace   # or: mise run build
 ```
 
 ## Boot a new machine
@@ -28,12 +31,12 @@ On a fresh machine, after the install one-liner:
 myplace
 ```
 
-With no existing setup detected, this opens the **bootstrap wizard**: it installs chezmoi and mise if missing, asks for your dotfiles repo and this machine's profile (`personal-mac` / `work-mac` / `server`), applies your dotfiles, installs your tools, and finishes with a status screen.
+With no existing setup detected, this opens the **bootstrap wizard**: it installs chezmoi and mise if missing, asks for the config repo (defaults to this one) and this machine's profile (`personal-mac` / `work-mac` / `server`), applies the dotfiles, installs the tools, and finishes with a status report.
 
 For servers, skip the wizard entirely:
 
 ```sh
-myplace bootstrap --repo git@github.com:you/dotfiles.git --profile server --yes
+myplace bootstrap --profile server --yes
 ```
 
 Details and failure handling: [bootstrap workflow](docs/workflows/bootstrap-new-machine.md).

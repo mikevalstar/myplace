@@ -43,6 +43,14 @@ Decided but not all spec'd yet — write the feature/workflow doc before buildin
 - **Machine profiles share by default**: personal Macs, work Mac, and servers are profiles over one common setup; per-machine differences are the exception, handled via chezmoi templates/data.
 - **Status is bidirectional**: "in sync" means no drift in *either* direction — local changes not pushed to the dotfiles repo, and repo/tool updates not yet applied locally both count as out of sync.
 
+## Monorepo layout (ADR-0003)
+
+This repo is simultaneously the app, the chezmoi source repo, and the mise config:
+
+- `home/` — chezmoi source state (selected by `.chezmoiroot`); the machines' global mise config lives at `home/dot_config/mise/config.toml.tmpl`
+- `mise.toml` at the root is dev tooling for **this repo only** (Go toolchain, build/test tasks) — don't confuse the two
+- `cmd/`, `internal/` — the Go app; `internal/{run,chezmoi,mise,drift}` must never import TUI packages
+
 ## Project state
 
-Design/documentation phase. Stack is chosen (ADR-0002); no code yet.
+v0 implemented and verified end-to-end: `bootstrap` (wizard + headless), `status` (TUI dashboard + `--json`, spec'd exit codes), `update` (converge-only: incoming dotfiles + tools). Not yet built: outgoing-drift capture (re-add/commit/push), per-file diff review, `self-update`, installer script, release pipeline.
