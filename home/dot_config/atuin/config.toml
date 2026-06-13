@@ -8,6 +8,12 @@
 # Enter runs the selected command immediately; Tab puts it on the line to edit.
 enter_accept = true
 
+# Catppuccin Mocha (mauve accent) for the interactive search TUI. atuin has no
+# bundled Catppuccin (built-ins are default/autumn/marine), so the theme file is
+# vendored alongside this config at themes/<name>.toml. Matches bat/delta/fzf.
+[theme]
+name = "catppuccin-mocha-mauve"
+
 [sync]
 # Use sync v2 (record-based) so multi-machine history stays consistent.
 records = true
