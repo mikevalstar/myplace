@@ -54,6 +54,22 @@ ensure_tool() {
 	fi
 }
 
+# ensure_cask NAME — install a macOS Homebrew cask (GUI app or font) when it's
+# missing. macOS-only by nature (no cask concept elsewhere); brew-if-present like
+# ensure_tool — ADR-0009 extends ADR-0008's brew story from formulae to casks.
+# Idempotent and failure-tolerant: skips off macOS and when the cask is present.
+ensure_cask() {
+	name="$1"
+	[ "$(uname -s)" = "Darwin" ] || return 0
+	if ! command -v brew >/dev/null 2>&1; then
+		log "$name: no Homebrew on this Mac — run 'brew install --cask $name' or install manually"
+		return 0
+	fi
+	brew list --cask "$name" >/dev/null 2>&1 && return 0
+	log "installing $name (brew cask)"
+	brew install --cask "$name" || log "$name cask install failed"
+}
+
 # --- git (prerequisite for chezmoi and the clones below; not a mise tool) ---
 # chezmoi's built-in git can clone the source repo on a machine with no system
 # git, so this can run first and install real git before it's needed below.
@@ -122,3 +138,9 @@ fi
 # --- non-registry CLI tools (not in mise's registry; brew-if-present on macOS, ADR-0008) ---
 ensure_tool http httpie
 ensure_tool mosh mosh
+
+# --- fonts (macOS-only Homebrew casks; the Linux fleet is headless servers — ADR-0009) ---
+ensure_cask font-monaspace-nf
+ensure_cask font-symbols-only-nerd-font
+ensure_cask font-jetbrains-mono-nerd-font
+ensure_cask font-fira-code-nerd-font

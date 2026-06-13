@@ -50,5 +50,6 @@ This **extends** ADR-0007's "what mise can't own" branch with a macOS path; it d
 ## Related
 
 - [ADR-0007](0007-provisioning-mechanism.md) — the provisioning split this extends
+- [ADR-0009](0009-homebrew-casks-macos.md) — extends the same brew-if-present idea from formulae to macOS casks (fonts/GUI)
 - [ADR-0003](0003-monorepo-app-dotfiles-mise.md) — the mise config as a managed dotfile
 - [managed-setup guide](../guides/managed-setup.md) — how to add a tool, including the `ensure_tool` path
