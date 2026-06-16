@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# backup — make a timestamped copy of a file before you edit it (and restore it).
+# mv_scripts: make a timestamped .bak copy of a file, with list and restore
+#
+# Managed by myplace (chezmoi) — edit at home/dot_mvscripts/executable_backup
+# in the repo, not at ~/.mvscripts/backup. See docs/adrs/0014.
+
+set -euo pipefail
+
+show_help() {
+  local r=cat
+  if command -v gum >/dev/null 2>&1 && [ -t 1 ]; then r="gum format"; fi
+  $r <<'EOF'
+# backup
+
+Make a timestamped copy of a file before a risky hand-edit, list those copies,
+or restore the most recent one. Copies sit next to the original, named
+`<file>.bak.<YYYYMMDD-HHMMSS>`.
+
+## Usage
+
+    backup <file>              copy file -> file.bak.<timestamp>
+    backup --list <file>       list existing backups, newest first
+    backup --restore <file>    restore the newest backup over <file> (confirm)
+    backup --restore <file> --yes   restore without confirming
+    backup -h | --help         this help
+
+Before a restore overwrites the current file, that current file is itself backed
+up first — so a restore is never lossy.
+
+## Exit codes
+
+    0   success
+    1   nothing to restore / no backups found
+    2   usage error
+    3   user declined at the prompt
+    4   source file does not exist
+EOF
+}
+
+mode="create"
+assume_yes=false
+file=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --list)    mode="list" ;;
+    --restore) mode="restore" ;;
+    --yes|-y)  assume_yes=true ;;
+    -h|--help) show_help; exit 0 ;;
+    -*) echo "backup: unknown argument: $1" >&2; echo "try: backup --help" >&2; exit 2 ;;
+    *)
+      if [ -z "$file" ]; then file="$1"
+      else echo "backup: unexpected argument: $1" >&2; exit 2; fi
+      ;;
+  esac
+  shift
+done
+
+if [ -z "$file" ]; then
+  echo "backup: a file argument is required." >&2
+  echo "try: backup --help" >&2
+  exit 2
+fi
+
+timestamp() { date +%Y%m%d-%H%M%S; }
+
+# A non-colliding path: append -1, -2, ... if the base already exists. Two
+# backups in the same second (or a same-second create+restore) must not clobber.
+unique_path() {
+  local base="$1" p="$1" n=1
+  while [ -e "$p" ]; do p="${base}-${n}"; n=$((n + 1)); done
+  printf '%s' "$p"
+}
+
+# newest backup path for $file, or empty
+latest_backup() {
+  ls -1t "$file".bak.* 2>/dev/null | head -n1 || true
+}
+
+case "$mode" in
+  create)
+    if [ ! -f "$file" ]; then
+      echo "backup: no such file: $file" >&2
+      exit 4
+    fi
+    dest=$(unique_path "$file.bak.$(timestamp)")
+    cp -p "$file" "$dest"
+    echo "backup: $file -> $dest"
+    ;;
+
+  list)
+    found=false
+    while IFS= read -r b; do
+      [ -n "$b" ] || continue
+      found=true
+      printf '  %s\n' "$b"
+    done < <(ls -1t "$file".bak.* 2>/dev/null || true)
+    if ! $found; then
+      echo "backup: no backups found for $file."
+      exit 1
+    fi
+    ;;
+
+  restore)
+    src=$(latest_backup)
+    if [ -z "$src" ]; then
+      echo "backup: no backups found for $file." >&2
+      exit 1
+    fi
+    echo "Restore: $src -> $file"
+    if [ -f "$file" ]; then
+      echo "(current $file will be saved first)"
+    fi
+    if ! $assume_yes; then
+      if command -v gum >/dev/null 2>&1 && [ -t 0 ]; then
+        gum confirm "Proceed with restore?" || { echo "Aborted."; exit 3; }
+      else
+        printf 'Proceed with restore? [y/N] '
+        read -r ans
+        case "$ans" in y|Y|yes|YES) ;; *) echo "Aborted."; exit 3 ;; esac
+      fi
+    fi
+    # Capture the source up front: the pre-save below must not be able to
+    # overwrite the backup we're about to restore from.
+    tmp=$(mktemp "${TMPDIR:-/tmp}/backup.XXXXXX")
+    cp -p "$src" "$tmp"
+    if [ -f "$file" ]; then
+      pre=$(unique_path "$file.bak.$(timestamp)")
+      cp -p "$file" "$pre"
+      echo "backup: saved current as $pre"
+    fi
+    cp -p "$tmp" "$file"
+    rm -f "$tmp"
+    echo "backup: restored $file from $src"
+    ;;
+esac

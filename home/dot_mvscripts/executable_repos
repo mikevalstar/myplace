@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# repos — overview of every git repo under ~/projects (branch, dirtiness, sync, age).
+# mv_scripts: table of every git repo under ~/projects with branch, status and sync
+#
+# Managed by myplace (chezmoi) — edit at home/dot_mvscripts/executable_repos
+# in the repo, not at ~/.mvscripts/repos. See docs/adrs/0014.
+
+set -euo pipefail
+
+show_help() {
+  local r=cat
+  if command -v gum >/dev/null 2>&1 && [ -t 1 ]; then r="gum format"; fi
+  $r <<'EOF'
+# repos
+
+Scan a projects directory and report each git repository's state in one table:
+
+- **Branch**  — the checked-out branch (or a short commit if detached)
+- **Status**  — `clean`, or `N dirty` (count of uncommitted/untracked entries)
+- **Sync**    — `↑a ↓b` ahead/behind its upstream, `-` if none, `no upstream` if unset
+- **Last**    — relative time of the most recent commit
+
+## Usage
+
+    repos                 pretty table (gum if available, plain columns otherwise)
+    repos --json          machine-readable JSON array
+    repos -h | --help     this help
+
+The scanned directory is `~/projects` by default; override with `MV_PROJECTS_DIR`.
+
+## Exit codes
+
+    0   at least one repo found
+    1   no git repositories found in the directory
+    2   usage error
+EOF
+}
+
+json=false
+case "${1:-}" in
+  --json)    json=true ;;
+  -h|--help) show_help; exit 0 ;;
+  "") ;;
+  *) echo "repos: unknown argument: $1" >&2; echo "try: repos --help" >&2; exit 2 ;;
+esac
+
+PROJECTS_DIR="${MV_PROJECTS_DIR:-$HOME/projects}"
+
+# Each row: name<TAB>branch<TAB>status<TAB>sync<TAB>last
+rows=()
+
+if [ -d "$PROJECTS_DIR" ]; then
+  for d in "$PROJECTS_DIR"/*/; do
+    [ -d "$d" ] || continue
+    git -C "$d" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
+    name=$(basename "$d")
+
+    branch=$(git -C "$d" symbolic-ref --quiet --short HEAD 2>/dev/null \
+             || git -C "$d" rev-parse --short HEAD 2>/dev/null || echo "?")
+
+    dirty=$(git -C "$d" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$dirty" = "0" ]; then status="clean"; else status="$dirty dirty"; fi
+
+    if git -C "$d" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+      counts=$(git -C "$d" rev-list --left-right --count '@{u}...HEAD' 2>/dev/null || echo "0	0")
+      behind=$(printf '%s' "$counts" | awk '{print $1}')
+      ahead=$(printf '%s' "$counts" | awk '{print $2}')
+      if [ "$ahead" = "0" ] && [ "$behind" = "0" ]; then
+        sync="-"
+      else
+        sync="↑${ahead} ↓${behind}"
+      fi
+    else
+      sync="no upstream"
+    fi
+
+    last=$(git -C "$d" log -1 --format='%cr' 2>/dev/null || echo "never")
+
+    rows+=("$name	$branch	$status	$sync	$last")
+  done
+fi
+
+if [ "${#rows[@]}" -gt 0 ]; then
+  IFS=$'\n' rows=($(sort <<<"${rows[*]}")); unset IFS
+fi
+
+if $json; then
+  printf '['
+  first=true
+  for r in "${rows[@]:-}"; do
+    [ -n "$r" ] || continue
+    IFS=$'\t' read -r name branch status sync last <<<"$r"
+    $first || printf ','
+    first=false
+    printf '\n  {"name":"%s","branch":"%s","status":"%s","sync":"%s","last":"%s"}' \
+      "$name" "$branch" "$status" "$sync" "$last"
+  done
+  [ "${#rows[@]:-0}" -gt 0 ] && printf '\n'
+  printf ']\n'
+  [ "${#rows[@]:-0}" -gt 0 ]
+  exit
+fi
+
+if [ "${#rows[@]:-0}" -eq 0 ]; then
+  echo "repos: no git repositories found in $PROJECTS_DIR."
+  exit 1
+fi
+
+if command -v gum >/dev/null 2>&1 && [ -t 1 ]; then
+  for r in "${rows[@]}"; do
+    IFS=$'\t' read -r name branch status sync last <<<"$r"
+    printf '%s|%s|%s|%s|%s\n' "$name" "$branch" "$status" "$sync" "$last"
+  done | gum table --separator '|' --columns 'Repo,Branch,Status,Sync,Last' --print
+else
+  printf '%-24s  %-18s  %-10s  %-12s  %s\n' "REPO" "BRANCH" "STATUS" "SYNC" "LAST"
+  for r in "${rows[@]}"; do
+    IFS=$'\t' read -r name branch status sync last <<<"$r"
+    printf '%-24s  %-18s  %-10s  %-12s  %s\n' "$name" "$branch" "$status" "$sync" "$last"
+  done
+fi

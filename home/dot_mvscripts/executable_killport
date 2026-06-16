@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# killport — find and kill whatever process is listening on a TCP port.
+# mv_scripts: find and kill the process listening on a given TCP port
+#
+# Managed by myplace (chezmoi) — edit at home/dot_mvscripts/executable_killport
+# in the repo, not at ~/.mvscripts/killport. See docs/adrs/0014.
+
+set -euo pipefail
+
+show_help() {
+  local r=cat
+  if command -v gum >/dev/null 2>&1 && [ -t 1 ]; then r="gum format"; fi
+  $r <<'EOF'
+# killport
+
+Find the process(es) listening on a TCP port and terminate them. Shows what's
+holding the port and asks to confirm before killing (unless `--yes`).
+
+Uses `lsof` when available, falling back to `fuser` (Linux).
+
+## Usage
+
+    killport 3000              kill whatever listens on :3000 (after confirm)
+    killport 3000 --yes        skip the confirmation
+    killport 3000 --force      use SIGKILL (-9) instead of SIGTERM
+    killport 3000 --list       just show the listeners, kill nothing
+    killport 3000 --json       machine-readable list of pids (kills nothing)
+    killport -h | --help       this help
+
+## Exit codes
+
+    0   killed (or nothing was listening)
+    2   usage error
+    3   user declined at the prompt
+    4   no port-inspection tool (lsof/fuser) available
+EOF
+}
+
+port=""
+assume_yes=false
+force=false
+list_only=false
+json=false
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --yes|-y)   assume_yes=true ;;
+    --force|-9) force=true ;;
+    --list)     list_only=true ;;
+    --json)     json=true ;;
+    -h|--help)  show_help; exit 0 ;;
+    -*) echo "killport: unknown argument: $1" >&2; echo "try: killport --help" >&2; exit 2 ;;
+    *)
+      if [ -z "$port" ]; then port="$1"
+      else echo "killport: unexpected argument: $1" >&2; exit 2; fi
+      ;;
+  esac
+  shift
+done
+
+if [ -z "$port" ] || ! printf '%s' "$port" | grep -qE '^[0-9]+$'; then
+  echo "killport: a numeric port is required (e.g. killport 3000)" >&2
+  exit 2
+fi
+
+# Collect listening pids.
+pids=""
+if command -v lsof >/dev/null 2>&1; then
+  pids=$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | sort -u || true)
+elif command -v fuser >/dev/null 2>&1; then
+  pids=$(fuser "${port}/tcp" 2>/dev/null | tr -s ' ' '\n' | grep -E '^[0-9]+$' | sort -u || true)
+else
+  echo "killport: need lsof or fuser to inspect ports." >&2
+  exit 4
+fi
+
+if $json; then
+  printf '{"port":%s,"pids":[' "$port"
+  first=true
+  for p in $pids; do $first || printf ','; first=false; printf '%s' "$p"; done
+  printf ']}\n'
+  exit 0
+fi
+
+if [ -z "$pids" ]; then
+  echo "killport: nothing is listening on :$port."
+  exit 0
+fi
+
+echo "Listening on :$port —"
+for p in $pids; do
+  cmd=$(ps -p "$p" -o comm= 2>/dev/null || echo "?")
+  printf '  pid %-8s %s\n' "$p" "$cmd"
+done
+
+if $list_only; then exit 0; fi
+
+sig="TERM"; $force && sig="KILL"
+
+if ! $assume_yes; then
+  if command -v gum >/dev/null 2>&1 && [ -t 0 ]; then
+    gum confirm "Send SIG$sig to the above process(es)?" || { echo "Aborted."; exit 3; }
+  else
+    printf 'Send SIG%s to the above process(es)? [y/N] ' "$sig"
+    read -r ans
+    case "$ans" in y|Y|yes|YES) ;; *) echo "Aborted."; exit 3 ;; esac
+  fi
+fi
+
+for p in $pids; do
+  kill "-$sig" "$p" 2>/dev/null || echo "killport: could not kill pid $p" >&2
+done
+echo "Done."

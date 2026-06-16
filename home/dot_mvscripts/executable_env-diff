@@ -1,0 +1,97 @@
+#!/usr/bin/env bun
+// env-diff — compare the keys in two dotenv files (reference vs. actual).
+// # mv_scripts: compare dotenv keys against an example and report missing/extra keys
+//
+// Managed by myplace (chezmoi) — edit at home/dot_mvscripts/executable_env-diff
+// in the repo, not at ~/.mvscripts/env-diff. See docs/adrs/0014.
+
+import { readFile } from "node:fs/promises";
+
+const HELP = `env-diff — compare the keys of two dotenv files
+
+Reports which keys the reference file declares that your env file is MISSING,
+and which EXTRA keys your env file has that the reference doesn't. Values are
+never printed or compared — only key names.
+
+Usage:
+  env-diff                       compare .env against .env.example
+  env-diff <reference>           compare .env against <reference>
+  env-diff <reference> <env>     compare <env> against <reference>
+  env-diff --json                machine-readable result
+  env-diff -h | --help           this help
+
+Arguments:
+  <reference>   the source of truth / example file   (default: .env.example)
+  <env>         the file being checked                (default: .env)
+
+Exit codes:
+  0  no differences          2  usage error
+  1  missing or extra keys   3  a file could not be read`;
+
+const args = process.argv.slice(2);
+let json = false;
+const positional = [];
+
+for (const a of args) {
+  if (a === "-h" || a === "--help") { console.log(HELP); process.exit(0); }
+  else if (a === "--json") json = true;
+  else if (a.startsWith("-")) {
+    console.error(`env-diff: unknown argument: ${a}`);
+    console.error("try: env-diff --help");
+    process.exit(2);
+  } else positional.push(a);
+}
+
+const reference = positional[0] ?? ".env.example";
+const envFile = positional[1] ?? ".env";
+
+function parseKeys(text) {
+  const keys = new Set();
+  for (let line of text.split(/\r?\n/)) {
+    line = line.trim();
+    if (!line || line.startsWith("#")) continue;
+    line = line.replace(/^export\s+/, "");
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    keys.add(line.slice(0, eq).trim());
+  }
+  return keys;
+}
+
+async function load(path) {
+  try {
+    return parseKeys(await readFile(path, "utf8"));
+  } catch (e) {
+    console.error(`env-diff: cannot read ${path}: ${e.message}`);
+    process.exit(3);
+  }
+}
+
+const refKeys = await load(reference);
+const envKeys = await load(envFile);
+
+const missing = [...refKeys].filter((k) => !envKeys.has(k)).sort();
+const extra = [...envKeys].filter((k) => !refKeys.has(k)).sort();
+
+if (json) {
+  console.log(JSON.stringify({ reference, env: envFile, missing, extra }, null, 2));
+  process.exit(missing.length || extra.length ? 1 : 0);
+}
+
+const RED = "\x1b[31m", YEL = "\x1b[33m", GRN = "\x1b[32m", DIM = "\x1b[2m", RST = "\x1b[0m";
+console.log(`${DIM}reference: ${reference}   env: ${envFile}${RST}`);
+
+if (!missing.length && !extra.length) {
+  console.log(`${GRN}✓ ${envFile} has exactly the keys in ${reference}.${RST}`);
+  process.exit(0);
+}
+
+if (missing.length) {
+  console.log(`\n${RED}Missing in ${envFile}${RST} (declared in ${reference}):`);
+  for (const k of missing) console.log(`  - ${k}`);
+}
+if (extra.length) {
+  console.log(`\n${YEL}Extra in ${envFile}${RST} (not in ${reference}):`);
+  for (const k of extra) console.log(`  + ${k}`);
+}
+process.exit(1);

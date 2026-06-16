@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+# gclean — prune stale local git branches (upstream gone, or merged into main).
+# mv_scripts: delete stale local git branches (gone upstream or merged), with a confirm
+#
+# Managed by myplace (chezmoi) — edit at home/dot_mvscripts/executable_gclean
+# in the repo, not at ~/.mvscripts/gclean. See docs/adrs/0014.
+
+set -euo pipefail
+
+show_help() {
+  local r=cat
+  if command -v gum >/dev/null 2>&1 && [ -t 1 ]; then r="gum format"; fi
+  $r <<'EOF'
+# gclean
+
+Delete **stale local branches** in the current git repo:
+
+- **gone**   — the branch tracked a remote branch that has since been deleted
+- **merged** — the branch is fully merged into the repo's main branch
+
+The current branch and protected names (main, master, develop) are never touched.
+By default gclean runs `git fetch --prune` first so "gone" is accurate, lists the
+candidates, asks for confirmation, then force-deletes (`git branch -D`).
+
+## Usage
+
+    gclean                 fetch+prune, list candidates, confirm, delete
+    gclean --dry-run       list what would be deleted, change nothing
+    gclean --yes           skip the confirmation prompt
+    gclean --no-fetch      skip the initial `git fetch --prune`
+    gclean --gone-only     only branches whose upstream is gone
+    gclean --merged-only   only branches merged into main
+    gclean --json          machine-readable list (implies --dry-run)
+    gclean -h | --help     this help
+
+## Exit codes
+
+    0   success (branches deleted, or nothing to do)
+    1   ran outside a git repository
+    2   usage error
+    3   user declined at the prompt
+EOF
+}
+
+dry_run=false
+assume_yes=false
+do_fetch=true
+want_gone=true
+want_merged=true
+json=false
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run)     dry_run=true ;;
+    --yes|-y)      assume_yes=true ;;
+    --no-fetch)    do_fetch=false ;;
+    --gone-only)   want_merged=false ;;
+    --merged-only) want_gone=false ;;
+    --json)        json=true; dry_run=true ;;
+    -h|--help)     show_help; exit 0 ;;
+    *) echo "gclean: unknown argument: $1" >&2; echo "try: gclean --help" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "gclean: not inside a git repository." >&2
+  exit 1
+fi
+
+if $do_fetch && ! $dry_run; then
+  git fetch --prune --quiet || true
+elif $do_fetch && $dry_run; then
+  # keep dry-run side-effect-free except for the read-only prune/fetch refresh
+  git fetch --prune --quiet >/dev/null 2>&1 || true
+fi
+
+# Resolve the main branch: origin/HEAD if set, else first existing of main/master.
+mainb=$(git symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || true)
+if [ -z "$mainb" ]; then
+  for c in main master; do
+    if git show-ref --verify --quiet "refs/heads/$c"; then mainb=$c; break; fi
+  done
+fi
+
+cur=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")
+protected="${mainb:-}|main|master|develop|${cur}"
+
+# Build "branch<TAB>reason" rows.
+rows=()
+
+if $want_gone; then
+  while IFS= read -r b; do
+    [ -n "$b" ] || continue
+    echo "$b" | grep -qxE "$protected" && continue
+    rows+=("$b	gone")
+  done < <(git for-each-ref --format '%(refname:short) %(upstream:track)' refs/heads \
+             | awk '$2=="[gone]"{print $1}')
+fi
+
+if $want_merged && [ -n "$mainb" ]; then
+  while IFS= read -r b; do
+    [ -n "$b" ] || continue
+    echo "$b" | grep -qxE "$protected" && continue
+    # skip if already captured as gone
+    dup=false
+    for r in "${rows[@]:-}"; do [ "${r%%	*}" = "$b" ] && dup=true && break; done
+    $dup && continue
+    rows+=("$b	merged")
+  done < <(git branch --merged "$mainb" --format '%(refname:short)')
+fi
+
+if $json; then
+  printf '['
+  first=true
+  for r in "${rows[@]:-}"; do
+    [ -n "$r" ] || continue
+    $first || printf ','
+    first=false
+    printf '\n  {"branch":"%s","reason":"%s"}' "${r%%	*}" "${r#*	}"
+  done
+  [ "${#rows[@]:-0}" -gt 0 ] && printf '\n'
+  printf ']\n'
+  exit 0
+fi
+
+if [ "${#rows[@]:-0}" -eq 0 ]; then
+  echo "gclean: nothing to clean — no stale branches."
+  exit 0
+fi
+
+echo "Stale branches:"
+for r in "${rows[@]}"; do
+  printf '  %-30s (%s)\n' "${r%%	*}" "${r#*	}"
+done
+echo
+
+if $dry_run; then
+  echo "(dry run — nothing deleted)"
+  exit 0
+fi
+
+if ! $assume_yes; then
+  if command -v gum >/dev/null 2>&1 && [ -t 0 ]; then
+    gum confirm "Delete ${#rows[@]} branch(es)?" || { echo "Aborted."; exit 3; }
+  else
+    printf 'Delete %d branch(es)? [y/N] ' "${#rows[@]}"
+    read -r ans
+    case "$ans" in y|Y|yes|YES) ;; *) echo "Aborted."; exit 3 ;; esac
+  fi
+fi
+
+for r in "${rows[@]}"; do
+  b="${r%%	*}"
+  git branch -D "$b"
+done

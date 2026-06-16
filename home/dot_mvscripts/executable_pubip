@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# pubip — print this machine's public IP address.
+# mv_scripts: print this machine's public IP address (with a few fallbacks)
+#
+# Managed by myplace (chezmoi) — edit at home/dot_mvscripts/executable_pubip
+# in the repo, not at ~/.mvscripts/pubip. See docs/adrs/0014.
+
+set -euo pipefail
+
+show_help() {
+  local r=cat
+  if command -v gum >/dev/null 2>&1 && [ -t 1 ]; then r="gum format"; fi
+  $r <<'EOF'
+# pubip
+
+Print the public IP address this machine appears as, by querying a small set of
+"what's my IP" endpoints in order until one answers.
+
+## Usage
+
+    pubip               print the IPv4 address
+    pubip -6            print the IPv6 address
+    pubip --json        machine-readable: {"ip":"…","family":"…"}
+    pubip -h | --help   this help
+
+## Exit codes
+
+    0   resolved an address
+    1   no endpoint answered
+    2   usage error
+EOF
+}
+
+family="4"
+json=false
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -4)        family="4" ;;
+    -6)        family="6" ;;
+    --json)    json=true ;;
+    -h|--help) show_help; exit 0 ;;
+    *) echo "pubip: unknown argument: $1" >&2; echo "try: pubip --help" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+if ! command -v curl >/dev/null 2>&1; then
+  echo "pubip: curl is required." >&2
+  exit 1
+fi
+
+if [ "$family" = "6" ]; then
+  endpoints="https://api64.ipify.org https://ifconfig.co/ip https://icanhazip.com"
+  curl_flag="-6"
+else
+  endpoints="https://api.ipify.org https://ifconfig.me/ip https://icanhazip.com"
+  curl_flag="-4"
+fi
+
+ip=""
+for url in $endpoints; do
+  ip=$(curl "$curl_flag" -fsS --max-time 5 "$url" 2>/dev/null | tr -d '[:space:]' || true)
+  [ -n "$ip" ] && break
+done
+
+if [ -z "$ip" ]; then
+  echo "pubip: could not determine public IP (no endpoint answered)." >&2
+  exit 1
+fi
+
+if $json; then
+  printf '{"ip":"%s","family":"ipv%s"}\n' "$ip" "$family"
+else
+  echo "$ip"
+fi

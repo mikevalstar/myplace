@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# whichver — show resolved versions of the core dev toolchain on this machine.
+# mv_scripts: table of installed toolchain versions (node, bun, go, rust, git, ...)
+#
+# Managed by myplace (chezmoi) — edit at home/dot_mvscripts/executable_whichver
+# in the repo, not at ~/.mvscripts/whichver. See docs/adrs/0014.
+
+set -euo pipefail
+
+show_help() {
+  local r=cat
+  if command -v gum >/dev/null 2>&1 && [ -t 1 ]; then r="gum format"; fi
+  $r <<'EOF'
+# whichver
+
+Report the resolved version and path of the core toolchain on this machine in
+one table — handy for bug reports and "what's this box actually running". Tools
+that aren't installed are shown as such, not hidden.
+
+## Usage
+
+    whichver              pretty table (gum if available, plain otherwise)
+    whichver --json       machine-readable JSON array
+    whichver -h | --help  this help
+
+## Exit codes
+
+    0   at least one tool resolved
+    1   none of the probed tools are installed
+    2   usage error
+EOF
+}
+
+json=false
+case "${1:-}" in
+  --json)    json=true ;;
+  -h|--help) show_help; exit 0 ;;
+  "") ;;
+  *) echo "whichver: unknown argument: $1" >&2; echo "try: whichver --help" >&2; exit 2 ;;
+esac
+
+# Probes: "command|Label". Version is the first line of `<cmd> --version`,
+# except `go`/`rustc` whose version subcommand differs (handled below).
+PROBES=(
+  "node|Node"
+  "bun|Bun"
+  "npm|npm"
+  "pnpm|pnpm"
+  "go|Go"
+  "rustc|Rust"
+  "cargo|Cargo"
+  "python3|Python"
+  "git|Git"
+  "fnm|fnm"
+  "mise|mise"
+  "chezmoi|chezmoi"
+)
+
+# Extract a clean version string for a command.
+ver_of() {
+  local cmd="$1" out=""
+  case "$cmd" in
+    go)    out=$(go version 2>/dev/null | awk '{print $3}' | sed 's/^go//') ;;
+    rustc) out=$(rustc --version 2>/dev/null | awk '{print $2}') ;;
+    *)     out=$("$cmd" --version 2>/dev/null | head -n1) ;;
+  esac
+  # strip a leading "v" and common "<name> version " noise, trim
+  out=${out#v}
+  out=$(printf '%s' "$out" | sed -E 's/^[A-Za-z_.-]+ +version +//I' | tr -d '\r')
+  printf '%s' "$out"
+}
+
+# rows: cmd<TAB>label<TAB>version<TAB>path  (version empty => not installed)
+rows=()
+found=0
+for entry in "${PROBES[@]}"; do
+  cmd=${entry%%|*}
+  label=${entry#*|}
+  if path=$(command -v "$cmd" 2>/dev/null); then
+    found=$((found + 1))
+    rows+=("$cmd	$label	$(ver_of "$cmd")	$path")
+  else
+    rows+=("$cmd	$label		")
+  fi
+done
+
+if $json; then
+  printf '['
+  first=true
+  for r in "${rows[@]}"; do
+    IFS=$'\t' read -r cmd label ver path <<<"$r"
+    installed=true; [ -z "$path" ] && installed=false
+    $first || printf ','
+    first=false
+    printf '\n  {"command":"%s","name":"%s","installed":%s,"version":"%s","path":"%s"}' \
+      "$cmd" "$label" "$installed" "$ver" "$path"
+  done
+  printf '\n]\n'
+  [ "$found" -gt 0 ]
+  exit
+fi
+
+if [ "$found" -eq 0 ]; then
+  echo "whichver: none of the probed tools are installed."
+  exit 1
+fi
+
+if command -v gum >/dev/null 2>&1 && [ -t 1 ]; then
+  for r in "${rows[@]}"; do
+    IFS=$'\t' read -r cmd label ver path <<<"$r"
+    [ -z "$ver" ] && ver="—"; [ -z "$path" ] && path="(not installed)"
+    printf '%s|%s|%s\n' "$label" "$ver" "$path"
+  done | gum table --separator '|' --columns 'Tool,Version,Path' --print
+else
+  printf '%-10s  %-16s  %s\n' "TOOL" "VERSION" "PATH"
+  for r in "${rows[@]}"; do
+    IFS=$'\t' read -r cmd label ver path <<<"$r"
+    [ -z "$ver" ] && ver="—"; [ -z "$path" ] && path="(not installed)"
+    printf '%-10s  %-16s  %s\n' "$label" "$ver" "$path"
+  done
+fi

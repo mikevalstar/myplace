@@ -1,0 +1,104 @@
+#!/usr/bin/env bun
+// serve-this — serve the current directory over HTTP on a random 6000-range port.
+// # mv_scripts: serve the current directory over HTTP (random 6000-range port or --port)
+//
+// Managed by myplace (chezmoi) — edit at home/dot_mvscripts/executable_serve-this
+// in the repo, not at ~/.mvscripts/serve-this. See docs/adrs/0014.
+
+import { stat, readdir } from "node:fs/promises";
+import { join, normalize, relative } from "node:path";
+
+const HELP = `serve-this — static file server for the current directory
+
+Usage:
+  serve-this                 serve ./ on a random port in 6000-6999
+  serve-this --port 8080     serve on a specific port
+  serve-this --dir ./public  serve a different directory
+  serve-this -h | --help     this help
+
+Notes:
+  - Directories with an index.html serve it; otherwise a simple file listing is shown.
+  - Path traversal outside the served root is rejected.
+  - Ctrl-C to stop.
+
+Exit codes:
+  0  clean shutdown   2  usage error   3  port already in use`;
+
+const args = process.argv.slice(2);
+let port = 6000 + Math.floor(Math.random() * 1000);
+let root = process.cwd();
+
+for (let i = 0; i < args.length; i++) {
+  const a = args[i];
+  if (a === "-h" || a === "--help") { console.log(HELP); process.exit(0); }
+  else if (a === "--port" || a === "-p") {
+    const v = args[++i];
+    if (!v || !/^\d+$/.test(v)) { console.error("serve-this: --port needs a number"); process.exit(2); }
+    port = parseInt(v, 10);
+  } else if (a === "--dir" || a === "-d") {
+    const v = args[++i];
+    if (!v) { console.error("serve-this: --dir needs a path"); process.exit(2); }
+    root = normalize(join(process.cwd(), v));
+  } else {
+    console.error(`serve-this: unknown argument: ${a}`);
+    console.error("try: serve-this --help");
+    process.exit(2);
+  }
+}
+
+const esc = (s) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+async function listing(dirPath, urlPath) {
+  const entries = await readdir(dirPath, { withFileTypes: true });
+  entries.sort((a, b) => (b.isDirectory() - a.isDirectory()) || a.name.localeCompare(b.name));
+  const up = urlPath === "/" ? "" : `<li><a href="../">../</a></li>`;
+  const items = entries
+    .map((e) => {
+      const slash = e.isDirectory() ? "/" : "";
+      const href = encodeURIComponent(e.name) + slash;
+      return `<li><a href="${href}">${esc(e.name)}${slash}</a></li>`;
+    })
+    .join("\n");
+  return `<!doctype html><meta charset="utf-8"><title>${esc(urlPath)}</title>
+<body style="font-family:ui-monospace,monospace;padding:1.5rem">
+<h2>${esc(urlPath)}</h2><ul>${up}${items}</ul></body>`;
+}
+
+let server;
+try {
+  server = Bun.serve({
+    port,
+    async fetch(req) {
+      const urlPath = decodeURIComponent(new URL(req.url).pathname);
+      const abs = normalize(join(root, urlPath));
+
+      // reject traversal outside root
+      const rel = relative(root, abs);
+      if (rel.startsWith("..")) return new Response("403 Forbidden", { status: 403 });
+
+      let info;
+      try { info = await stat(abs); }
+      catch { return new Response("404 Not Found", { status: 404 }); }
+
+      if (info.isDirectory()) {
+        const index = join(abs, "index.html");
+        try {
+          await stat(index);
+          return new Response(Bun.file(index));
+        } catch {
+          const html = await listing(abs, urlPath.endsWith("/") ? urlPath : urlPath + "/");
+          return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+        }
+      }
+      return new Response(Bun.file(abs));
+    },
+  });
+} catch (e) {
+  console.error(`serve-this: could not bind port ${port}: ${e.message}`);
+  process.exit(3);
+}
+
+console.log(`serve-this: serving ${root}`);
+console.log(`            http://localhost:${server.port}`);
+console.log("            (Ctrl-C to stop)");
