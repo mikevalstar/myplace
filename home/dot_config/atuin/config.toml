@@ -8,6 +8,17 @@
 # Enter runs the selected command immediately; Tab puts it on the line to edit.
 enter_accept = true
 
+# Up-arrow scopes history to the current git workspace (the whole repo), so ↑ in
+# a project surfaces what you ran *in that project*. Ctrl-R stays global; cycle
+# filter modes live with Ctrl-R inside the search TUI. Needs workspaces = true
+# so atuin detects the enclosing git repo.
+filter_mode_shell_up_key_binding = "workspace"
+workspaces = true
+
+# Show a preview pane (full command + exit code, duration, dir) for the
+# highlighted result.
+show_preview = true
+
 # Catppuccin Mocha (mauve accent) for the interactive search TUI. atuin has no
 # bundled Catppuccin (built-ins are default/autumn/marine), so the theme file is
 # vendored alongside this config at themes/<name>.toml. Matches bat/delta/fzf.
