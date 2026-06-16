@@ -21,10 +21,11 @@ Where things live and how to add a new tool, dotfile, or provisioning step so it
 | `dot_mvscripts/executable_*` | Helper scripts deployed to a dedicated `~/.mvscripts` (on `PATH`), runnable by name on every machine; `mv_scripts` lists them ([ADR-0014](../adrs/0014-managed-scripts-and-bun-runner.md)) |
 | `.chezmoiscripts/run_onchange_provision.sh` | Idempotent installer for the things mise can't own — git, oh-my-zsh + plugins, rustup, fnm, plain OS/brew packages via `ensure_tool` (httpie, mosh), and macOS-only fonts/GUI casks via `ensure_cask` |
 | `dot_zshrc` | The managed `~/.zshrc` — oh-my-zsh setup, mise activation, tool env wiring |
-| `dot_gitconfig.tmpl` | Git identity (`~/.gitconfig`) — name/email, rendered from install-time data (`.gitName`/`.gitEmail`) |
+| `dot_gitconfig.tmpl` | `~/.gitconfig` — identity (name/email from `.gitName`/`.gitEmail`), modern defaults, and SSH commit signing auto-enabled when a key exists ([ADR-0015](../adrs/0015-git-defaults-and-ssh-commit-signing.md)) |
+| `dot_config/git/allowed_signers.tmpl` | `~/.config/git/allowed_signers` — generated `<email> <pubkey>` so local signature verification works; empty (and signing off) on a keyless machine |
 | `dot_mvdotfiles.zsh` | Personal shell config (`~/.mvdotfiles.zsh`) sourced by `.zshrc`: tool inits, aliases, functions |
 | `dot_nanorc.tmpl` | The managed `~/.nanorc` — GNU nano syntax highlighting (includes the bundled syntax files, path templated per OS/arch) + editor niceties |
-| `.chezmoi.toml.tmpl` | Init prompts → chezmoi data: `profile`, plus `gitName`/`gitEmail` (answered at install, pre-fillable with `--promptString`) |
+| `.chezmoi.toml.tmpl` | Init prompts → chezmoi data: `profile`, plus `gitName`/`gitEmail` (answered at install, pre-fillable with `--promptString`). Optional `signingKey` (no prompt; `dig`-defaulted) overrides the commit-signing key path |
 
 `dot_` becomes a leading `.` in the target; a `.tmpl` suffix means chezmoi templates it.
 
@@ -105,6 +106,7 @@ Tool init (`eval "$(x init zsh)"`, PATH additions) goes in `dot_mvdotfiles.zsh`,
 - **Homebrew on macOS is opportunistic, never required.** `ensure_tool` uses brew when it's present and logs a note when it isn't, so a brew-less Mac still bootstraps; anything in mise's registry still belongs in mise, not here ([ADR-0008](../adrs/0008-opportunistic-homebrew-macos.md)).
 - **macOS `nano` is pico, not GNU nano.** `/usr/bin/nano` is a symlink to pico, which can't do syntax highlighting, so `command -v nano` is misleading and `ensure_tool nano nano` would no-op. The provision script installs real GNU nano via brew explicitly (idempotent on `brew list`); `~/.nanorc` (`dot_nanorc.tmpl`) wires up highlighting. On Linux `nano` is already GNU nano.
 - **Fonts and GUI apps are macOS-only.** They install as Homebrew casks via `ensure_cask`; the Linux fleet is headless servers, so casks are skipped there by design. A Linux desktop would need a different path (chezmoi externals) — not built yet ([ADR-0009](../adrs/0009-homebrew-casks-macos.md)).
+- **Commit signing auto-enables only when a key is present.** `dot_gitconfig.tmpl` turns on SSH signing when `~/.ssh/id_ed25519.pub` (or the `signingKey` data override) exists, so a keyless machine signs nothing and never fails a commit. After a machine starts signing, upload the **public** key to GitHub as a *signing* key (separate from an auth key) once for the Verified badge: `gh ssh-key add ~/.ssh/id_ed25519.pub --type signing --title "$(hostname)"` ([ADR-0015](../adrs/0015-git-defaults-and-ssh-commit-signing.md)).
 
 ## References
 

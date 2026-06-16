@@ -1,0 +1,9 @@
+{{- /* Managed by myplace (chezmoi) — see ADR-0015. Maps the committer email to
+the SSH key that signs commits so `git log --show-signature` / `git verify-commit`
+validate locally. Generated from the public key referenced by gpg.ssh in
+~/.gitconfig; gated on the key existing, so a keyless machine gets an empty file
+and signing stays off. Rotating the key regenerates this on the next apply. */ -}}
+{{- $signingKey := dig "signingKey" (joinPath .chezmoi.homeDir ".ssh" "id_ed25519.pub") . -}}
+{{- if stat $signingKey -}}
+{{ dig "gitEmail" "mike@valstar.dev" . }} {{ output "cat" $signingKey | trim }}
+{{ end -}}
