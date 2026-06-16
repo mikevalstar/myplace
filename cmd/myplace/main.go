@@ -26,10 +26,21 @@ import (
 var logger *charmlog.Logger
 
 func main() {
-	// Bootstrap installs into ~/.local/bin; make sure we can see binaries
-	// there even before the user's next shell does.
+	// Bootstrap installs mise into ~/.local/bin, and mise puts the shims for the
+	// tools it manages under $XDG_DATA_HOME/mise/shims (default
+	// ~/.local/share/mise/shims). Prepend both so we find mise AND the tools it
+	// manages (e.g. fastfetch for `sysinfo`) even off a non-interactive shell
+	// that never activated mise — every command must be agent-runnable (ADR-0006).
 	if home, err := os.UserHomeDir(); err == nil {
-		os.Setenv("PATH", filepath.Join(home, ".local", "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
+		dataHome := os.Getenv("XDG_DATA_HOME")
+		if dataHome == "" {
+			dataHome = filepath.Join(home, ".local", "share")
+		}
+		prepend := strings.Join([]string{
+			filepath.Join(home, ".local", "bin"),
+			filepath.Join(dataHome, "mise", "shims"),
+		}, string(os.PathListSeparator))
+		os.Setenv("PATH", prepend+string(os.PathListSeparator)+os.Getenv("PATH"))
 	}
 
 	// Persistent debug trace to <state-dir>/myplace.log (ADR-0005). Tag the
