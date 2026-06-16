@@ -25,7 +25,8 @@ Where things live and how to add a new tool, dotfile, or provisioning step so it
 | `dot_config/git/allowed_signers.tmpl` | `~/.config/git/allowed_signers` — generated `<email> <pubkey>` so local signature verification works; empty (and signing off) on a keyless machine |
 | `dot_mvdotfiles.zsh` | Personal shell config (`~/.mvdotfiles.zsh`) sourced by `.zshrc`: tool inits, aliases, functions |
 | `dot_nanorc.tmpl` | The managed `~/.nanorc` — GNU nano syntax highlighting (includes the bundled syntax files, path templated per OS/arch) + editor niceties |
-| `.chezmoi.toml.tmpl` | Init prompts → chezmoi data: `profile`, plus `gitName`/`gitEmail` (answered at install, pre-fillable with `--promptString`). Optional `signingKey` (no prompt; `dig`-defaulted) overrides the commit-signing key path |
+| `private_dot_ssh/private_config.tmpl` | `~/.ssh/config` — non-secret global `Host *` defaults for every machine; on non-`server` profiles it also pulls the full host list (with IPs) from a 1Password Document at apply time, so secrets stay out of this public repo ([ADR-0016](../adrs/0016-secrets-in-dotfiles-via-1password.md)) |
+| `.chezmoi.toml.tmpl` | Init prompts → chezmoi data: `profile`, `push`, plus `gitName`/`gitEmail` (answered at install, pre-fillable with `--promptString`). Optional `signingKey` (no prompt; `dig`-defaulted) overrides the commit-signing key path |
 
 `dot_` becomes a leading `.` in the target; a `.tmpl` suffix means chezmoi templates it.
 
@@ -93,6 +94,36 @@ so our scripts don't mingle with mise/installer binaries) through the normal
 - You own portability: use `$HOME` not `/Users/<you>`, guard against missing deps, and
   keep shell scripts POSIX-safe enough for the headless Linux servers.
 
+### A dotfile that carries secrets (1Password)
+
+When a managed file holds something that must not land in the public repo (server
+IPs, tokens), keep the file chezmoi-managed but pull the secret content from
+1Password at apply time — never the `private_` prefix alone (that only sets 0600
+perms; the content is still committed in plaintext). Rationale and trade-offs:
+[ADR-0016](../adrs/0016-secrets-in-dotfiles-via-1password.md).
+
+The worked example is `~/.ssh/config` (`private_dot_ssh/private_config.tmpl`):
+
+1. **Store the secret in 1Password.** For a whole file, create a **Document**
+   item (here titled `ssh config` in the `Private` vault) holding the real config
+   — the host blocks with their `HostName` IPs. For a single value, use a normal
+   field instead.
+2. **Reference it from the template**, not the repo:
+   ```gotmpl
+   {{ onepasswordDocument "ssh config" "Private" }}     # whole file
+   {{ onepasswordRead "op://Private/some-item/token" }} # one field
+   ```
+3. **Gate by profile so servers don't need the secret.** Wrap the pull in
+   `{{ if ne .profile "server" }}…{{ end }}`. Go templates only evaluate the taken
+   branch, so servers never call `op` — they render only the non-secret parts.
+   This is what lets headless servers converge without a 1Password session.
+4. **Gate OS-specific keywords on `.chezmoi.os`, not profile** (e.g. `UseKeychain`
+   is Apple-openssh-only; Linux `ssh` errors on it). Both mac profiles are
+   `darwin`, so OS is the correct axis for OS quirks.
+5. **To change the host list later, edit the 1Password Document** — not this repo.
+   To change the shared defaults every machine gets, edit the `Host *` block in
+   the template and `myplace update`.
+
 ### Shell tool wiring
 
 Tool init (`eval "$(x init zsh)"`, PATH additions) goes in `dot_mvdotfiles.zsh`, guarded with `command -v x` so a missing tool is silent. mise activation and the fnm/cargo env lines live in `dot_zshrc`.
@@ -106,6 +137,12 @@ Tool init (`eval "$(x init zsh)"`, PATH additions) goes in `dot_mvdotfiles.zsh`,
 - **Homebrew on macOS is opportunistic, never required.** `ensure_tool` uses brew when it's present and logs a note when it isn't, so a brew-less Mac still bootstraps; anything in mise's registry still belongs in mise, not here ([ADR-0008](../adrs/0008-opportunistic-homebrew-macos.md)).
 - **macOS `nano` is pico, not GNU nano.** `/usr/bin/nano` is a symlink to pico, which can't do syntax highlighting, so `command -v nano` is misleading and `ensure_tool nano nano` would no-op. The provision script installs real GNU nano via brew explicitly (idempotent on `brew list`); `~/.nanorc` (`dot_nanorc.tmpl`) wires up highlighting. On Linux `nano` is already GNU nano.
 - **Fonts and GUI apps are macOS-only.** They install as Homebrew casks via `ensure_cask`; the Linux fleet is headless servers, so casks are skipped there by design. A Linux desktop would need a different path (chezmoi externals) — not built yet ([ADR-0009](../adrs/0009-homebrew-casks-macos.md)).
+- **1Password-backed dotfiles make `status` shell out to `op`.** chezmoi evaluates
+  `onepassword*` functions during *every* target-state computation — `apply`,
+  `status`, **and** `diff` — so on a mac `myplace status` invokes the 1Password CLI.
+  With the desktop app's CLI integration that's a cached, no-prompt session; if `op`
+  is locked or absent, chezmoi errors and `status` exits 3. Servers never hit this
+  (the secret pull is behind the non-`server` branch) ([ADR-0016](../adrs/0016-secrets-in-dotfiles-via-1password.md)).
 - **Commit signing auto-enables only when a key is present.** `dot_gitconfig.tmpl` turns on SSH signing when `~/.ssh/id_ed25519.pub` (or the `signingKey` data override) exists, so a keyless machine signs nothing and never fails a commit. After a machine starts signing, upload the **public** key to GitHub as a *signing* key (separate from an auth key) once for the Verified badge: `gh ssh-key add ~/.ssh/id_ed25519.pub --type signing --title "$(hostname)"` ([ADR-0015](../adrs/0015-git-defaults-and-ssh-commit-signing.md)).
 
 ## References

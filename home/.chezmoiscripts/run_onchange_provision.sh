@@ -161,6 +161,12 @@ fi
 # fleet; on macOS it comes from brew-if-present here instead (ADR-0008).
 [ "$(uname -s)" = "Darwin" ] && ensure_tool btop btop
 
+# --- 1Password CLI (macOS-only cask; the Linux servers don't get the secret SSH
+# config that needs it — ADR-0016). `op` is what chezmoi's onepasswordDocument
+# shells out to when rendering ~/.ssh/config on desktops; enable the app's
+# "Integrate with 1Password CLI" setting once so it unlocks without a manual signin. ---
+ensure_cask 1password-cli
+
 # --- fonts (macOS-only Homebrew casks; the Linux fleet is headless servers — ADR-0009) ---
 ensure_cask font-monaspace-nf
 ensure_cask font-symbols-only-nerd-font

@@ -1,0 +1,25 @@
+{{/* ~/.ssh/config — managed by myplace. See ADR-0016 and the managed-setup guide.
+
+  The full, host-bearing config (server IPs etc.) is NOT in this public repo: it
+  lives in a 1Password Document and is pulled at apply time. Only macs get it;
+  servers render just the non-secret global defaults below.
+
+  To edit the host list: open the "ssh config" Document in 1Password (Private
+  vault) and edit it there — do not paste hosts into this repo. To change the
+  shared defaults every machine gets, edit the `Host *` block in this file.
+
+  onepasswordDocument args: "<item title or uuid>" "<vault>". Adjust if you store
+  it elsewhere. Requires an authenticated `op` (1Password CLI) on macs. */ -}}
+{{- if ne .profile "server" }}
+{{ onepasswordDocument "ssh config" "Private" -}}
+{{ end }}
+# --- global defaults (managed by myplace; every machine) ---
+Host *
+    AddKeysToAgent yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+    HashKnownHosts yes
+    VisualHostKey yes
+{{- if eq .chezmoi.os "darwin" }}
+    UseKeychain yes
+{{- end }}
