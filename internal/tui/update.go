@@ -402,11 +402,15 @@ func (m *Model) sizeDetail() {
 		m.detailVP.Height = max1(m.height - 3)
 		return
 	}
-	// wide inline panel: right ~40%, inside a bordered box with a title row
+	// wide inline panel: right ~40%, inside a bordered box with a title row.
+	// Subtract the system-info band (it sits above the body in wideView), the
+	// box border (2), and the title row (1) — matching wideView's bodyH so the
+	// right panel is exactly as tall as the left column and the dashboard fills
+	// the screen without overflowing.
 	leftW := m.width * 60 / 100
 	dw := m.width - leftW
 	m.detailVP.Width = max1(dw - 4)
-	m.detailVP.Height = max1((m.height - 3) - 2 - 1)
+	m.detailVP.Height = max1((m.height - 3 - sysinfoBandLines) - 2 - 1)
 }
 
 // syncDetail rebuilds the detail viewport content from the focused selection.

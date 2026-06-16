@@ -72,6 +72,23 @@ func assertNoOverflow(t *testing.T, label, out string, w int) {
 	}
 }
 
+// TestDashboardFillsHeight guards against vertical overflow: the paneled
+// dashboard (wide and narrow) must render exactly `height` rows. One row too
+// many scrolls the header and the top of the system-info band off the
+// alt-screen — the regression where the detail viewport wasn't sized for the
+// band. Run with the band populated, the realistic case.
+func TestDashboardFillsHeight(t *testing.T) {
+	for _, w := range []int{80, 100, 120, 160, 200} { // narrow (<120) and wide (≥120)
+		for _, h := range []int{20, 30, 50} {
+			m := sampleModel(w, h)
+			m.system = sampleSysinfo()
+			if got := strings.Count(m.View(), "\n") + 1; got != h {
+				t.Errorf("w=%d h=%d: rendered %d rows, want %d (overflow clips the top)", w, h, got, h)
+			}
+		}
+	}
+}
+
 // TestRenderNoWrap asserts every rendered line fits the terminal width — i.e.
 // nothing wraps past the frame — across narrow, wide, and tall terminals (the
 // master-detail split and focus highlight must hold too).

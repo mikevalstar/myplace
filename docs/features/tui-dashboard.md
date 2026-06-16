@@ -87,7 +87,7 @@ A 1-second `tea.Tick` reloads the tail of `myplace.log` into the Activity pane �
 
 ### System-info band
 
-A passive, three-line band sits between the header and the panes (fixed height, so the layout never shifts): **identity** (host model · OS · arch), **compute** (CPU · cores · GPU · RAM · root-disk used/total), and **power/net** (battery · local IPv4 · uptime). It loads asynchronously from fastfetch alongside the status report — `system: loading…` until it lands — and degrades to a single `system: fastfetch unavailable` line if fastfetch isn't installed. It has no keybinding and never affects the verdict badge. See [System information](system-information.md).
+A passive, three-line band sits between the header and the panes (fixed height, so the layout never shifts): **identity** (OS · host model · arch — OS leads so it survives truncation), **compute** (CPU · cores · GPU · RAM used/total/free · root-disk used/total), and **runtime** (load averages · swap used/total/free · battery · local IPv4 · uptime). Colored labels (mauve) with a teal OS headline, dimmed values. It loads asynchronously from fastfetch alongside the status report — `system: loading…` until it lands — and degrades to a single `system: fastfetch unavailable` line if fastfetch isn't installed. It has no keybinding and never affects the verdict badge. See [System information](system-information.md).
 
 ### Outdated detail (`o`)
 

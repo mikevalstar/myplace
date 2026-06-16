@@ -15,9 +15,11 @@ func sampleSysinfo() *sysinfo.Info {
 		CPU:     sysinfo.CPU{Name: "Apple M4 Pro", CoresLogical: 12},
 		GPUs:    []sysinfo.GPU{{Name: "Apple M4 Pro"}},
 		Memory:  sysinfo.Memory{TotalBytes: 25769803776, UsedBytes: 18000000000},
+		Swap:    []sysinfo.Swap{{Name: "Encrypted", TotalBytes: 11811160064, UsedBytes: 11044782080}},
 		Disks:   []sysinfo.Disk{{Name: "Macintosh HD", Mountpoint: "/", TotalBytes: 494384795648, UsedBytes: 465891303424}},
 		Battery: &sysinfo.Battery{Capacity: 80, CycleCount: 92, Status: []string{"AC Connected"}},
 		Network: []sysinfo.NetIf{{Interface: "en0", IPv4: "10.0.20.23"}},
+		Load:    []float64{2.34, 2.10, 1.98},
 		Uptime:  sysinfo.Uptime{UptimeMs: 716159060},
 	}
 }
@@ -28,9 +30,9 @@ func TestSysinfoBandLinesContent(t *testing.T) {
 		t.Fatalf("want %d lines, got %d", sysinfoBandLines, len(lines))
 	}
 	wantPerLine := [][]string{
-		{"MacBook Pro", "macOS Tahoe 26.5.1", "arm64"},
-		{"Apple M4 Pro", "12 cores", "GPU", "RAM", "Disk / "},
-		{"Battery 80%", "92 cyc", "AC Connected", "10.0.20.23", "up "},
+		{"macOS Tahoe 26.5.1", "MacBook Pro", "arm64"},
+		{"Apple M4 Pro", "12 cores", "GPU", "RAM", "free", "Disk / "},
+		{"Load 2.34 2.10 1.98", "Swap", "Battery 80%", "92 cyc", "AC Connected", "10.0.20.23", "up "},
 	}
 	for i, wants := range wantPerLine {
 		for _, w := range wants {

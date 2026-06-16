@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/mikevalstar/myplace/internal/run"
@@ -29,17 +30,18 @@ func New(r run.Runner) *Client {
 // (the command wraps it with schema/machine/checked_at). Byte counts are raw;
 // renderers humanize them.
 type Info struct {
-	OS      OS       `json:"os"`
-	Host    Host     `json:"host"`
-	Kernel  Kernel   `json:"kernel"`
-	CPU     CPU      `json:"cpu"`
-	GPUs    []GPU    `json:"gpus,omitempty"`
-	Memory  Memory   `json:"memory"`
-	Swap    []Swap   `json:"swap,omitempty"`
-	Disks   []Disk   `json:"disks,omitempty"`
-	Battery *Battery `json:"battery,omitempty"`
-	Network []NetIf  `json:"network,omitempty"`
-	Uptime  Uptime   `json:"uptime"`
+	OS      OS        `json:"os"`
+	Host    Host      `json:"host"`
+	Kernel  Kernel    `json:"kernel"`
+	CPU     CPU       `json:"cpu"`
+	GPUs    []GPU     `json:"gpus,omitempty"`
+	Memory  Memory    `json:"memory"`
+	Swap    []Swap    `json:"swap,omitempty"`
+	Disks   []Disk    `json:"disks,omitempty"`
+	Battery *Battery  `json:"battery,omitempty"`
+	Network []NetIf   `json:"network,omitempty"`
+	Load    []float64 `json:"load,omitempty"` // 1/5/15-minute load averages (from uptime)
+	Uptime  Uptime    `json:"uptime"`
 }
 
 type OS struct {
@@ -232,13 +234,52 @@ func Parse(out []byte) (*Info, error) {
 
 // Fetch runs `fastfetch --format json` through the runner choke point and
 // parses it. An error means fastfetch isn't on PATH or failed; callers fail
-// fast (the command) or degrade to a notice (the TUI band).
+// fast (the command) or degrade to a notice (the TUI band). Load averages
+// aren't a fastfetch module, so they're read separately from `uptime`
+// (best-effort: a failure leaves Load nil rather than failing the whole fetch).
 func (c *Client) Fetch(ctx context.Context) (*Info, error) {
 	out, err := c.r.Run(ctx, c.home, "fastfetch", "--format", "json")
 	if err != nil {
 		return nil, err
 	}
-	return Parse(out)
+	info, err := Parse(out)
+	if err != nil {
+		return nil, err
+	}
+	if up, e := c.r.Run(ctx, c.home, "uptime"); e == nil {
+		info.Load = parseLoadAvg(string(up))
+	}
+	return info, nil
+}
+
+// parseLoadAvg pulls the 1/5/15-minute load averages out of `uptime` output,
+// which on both macOS ("… load averages: 2.34 2.10 1.98") and Linux ("… load
+// average: 0.52, 0.58, 0.59") trails the line after "load average". Returns up
+// to three values, or nil if none parse.
+func parseLoadAvg(uptimeOut string) []float64 {
+	i := strings.Index(uptimeOut, "load average")
+	if i < 0 {
+		return nil
+	}
+	rest := uptimeOut[i:]
+	if c := strings.IndexByte(rest, ':'); c >= 0 {
+		rest = rest[c+1:]
+	}
+	fields := strings.FieldsFunc(rest, func(r rune) bool {
+		return r == ',' || r == ' ' || r == '\t' || r == '\n'
+	})
+	var out []float64
+	for _, f := range fields {
+		v, err := strconv.ParseFloat(f, 64)
+		if err != nil {
+			break
+		}
+		out = append(out, v)
+		if len(out) == 3 {
+			break
+		}
+	}
+	return out
 }
 
 // interestingDisk keeps the disks worth showing in a specs view and drops the

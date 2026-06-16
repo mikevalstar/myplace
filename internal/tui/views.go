@@ -399,9 +399,11 @@ func (m Model) footer(width int) string {
 	fh.ShowAll = false
 	fh.Width = width
 	left := fh.View(m.keys)
-	var right string
+	// Always show the running version on the right; when a newer release is
+	// out, the same slot shows the upgrade in the notice color.
+	right := th.Subtle.Render("myplace v" + m.version)
 	if r := m.report; r != nil && r.Myplace.Latest != nil && *r.Myplace.Latest != r.Myplace.Current {
-		right = th.Notice.Render(fmt.Sprintf("update available: %s ↑", *r.Myplace.Latest))
+		right = th.Notice.Render(fmt.Sprintf("myplace v%s → %s ↑", m.version, *r.Myplace.Latest))
 	}
 	gap := width - lipgloss.Width(left) - lipgloss.Width(right)
 	if gap < 1 {

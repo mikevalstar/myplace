@@ -113,6 +113,24 @@ func TestParseServerMissingModules(t *testing.T) {
 	}
 }
 
+func TestParseLoadAvg(t *testing.T) {
+	cases := map[string][]float64{
+		// macOS uptime: "load averages:" (plural), space-separated.
+		"12:34  up 7 days, 22:01, 3 users, load averages: 2.34 2.10 1.98": {2.34, 2.10, 1.98},
+		// Linux uptime: "load average:" (singular), comma-separated.
+		" 12:34:56 up 7 days, 22:01,  3 users,  load average: 0.52, 0.58, 0.59": {0.52, 0.58, 0.59},
+	}
+	for in, want := range cases {
+		got := parseLoadAvg(in)
+		if len(got) != 3 || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+			t.Errorf("parseLoadAvg(%q) = %v, want %v", in, got, want)
+		}
+	}
+	if got := parseLoadAvg("no averages here"); got != nil {
+		t.Errorf("expected nil for input without load averages, got %v", got)
+	}
+}
+
 func TestParseInvalid(t *testing.T) {
 	if _, err := Parse([]byte(`not json`)); err == nil {
 		t.Error("expected error on non-JSON input")

@@ -94,7 +94,22 @@ func renderSysinfoText(info *sysinfo.Info) string {
 		line("GPU", strings.Join(names, ", "))
 	}
 	if info.Memory.TotalBytes > 0 {
-		line("Memory", fmt.Sprintf("%s / %s", humanize.IBytes(info.Memory.UsedBytes), humanize.IBytes(info.Memory.TotalBytes)))
+		line("Memory", memLine(info.Memory.UsedBytes, info.Memory.TotalBytes))
+	}
+	var swTotal, swUsed uint64
+	for _, sw := range info.Swap {
+		swTotal += sw.TotalBytes
+		swUsed += sw.UsedBytes
+	}
+	if swTotal > 0 {
+		line("Swap", memLine(swUsed, swTotal))
+	}
+	if len(info.Load) > 0 {
+		nums := make([]string, len(info.Load))
+		for i, v := range info.Load {
+			nums[i] = fmt.Sprintf("%.2f", v)
+		}
+		line("Load", strings.Join(nums, " "))
 	}
 	for _, d := range info.Disks {
 		line("Disk", fmt.Sprintf("%s  %s / %s (%s)", d.Mountpoint, humanize.IBytes(d.UsedBytes), humanize.IBytes(d.TotalBytes), d.Name))
@@ -118,4 +133,13 @@ func renderSysinfoText(info *sysinfo.Info) string {
 	}
 	machine, _ := os.Hostname()
 	return fmt.Sprintf("%s — system info\n%s", machine, b.String())
+}
+
+// memLine formats "used / total (free free)" for memory and swap.
+func memLine(used, total uint64) string {
+	var free uint64
+	if total > used {
+		free = total - used
+	}
+	return fmt.Sprintf("%s / %s (%s free)", humanize.IBytes(used), humanize.IBytes(total), humanize.IBytes(free))
 }

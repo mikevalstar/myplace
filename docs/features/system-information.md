@@ -21,7 +21,7 @@ The dashboard tells you whether a machine is *in sync*, but not *which machine* 
 
 ### In scope
 
-- A curated system-info snapshot: **OS** (name, version, build), **Host** (model, vendor), **Kernel** (arch), **CPU** (model, cores), **GPU**, **Memory**, **Disk** (per mountpoint), **Swap**, **Battery**, **Network** (local IPv4), **Uptime**.
+- A curated system-info snapshot: **OS** (name, version, build), **Host** (model, vendor), **Kernel** (arch), **CPU** (model, cores), **GPU**, **Memory** (used/total/free), **Disk** (per mountpoint), **Swap** (used/total/free), **Battery**, **Network** (local IPv4), **load averages**, **Uptime**.
 - Headless `myplace sysinfo` (plain text) and `myplace sysinfo --json`.
 - A passive header band on the TUI dashboard (no new keybinding).
 - Graceful degradation: absent fastfetch modules (e.g. a server with no battery/GPU) are simply omitted, not errors.
@@ -39,7 +39,7 @@ The dashboard tells you whether a machine is *in sync*, but not *which machine* 
 
 `myplace sysinfo` prints a readable multi-line block; `myplace sysinfo --json` emits one JSON document on stdout (logs to stderr, per the [headless contract](headless-cli-and-json-output.md)). It never prompts and never mutates, so it's fully agent-runnable off a TTY.
 
-fastfetch is a read **dependency** installed via the mise baseline (ADR-0013/0007). If it isn't on PATH or fails, the command fails fast naming the dependency (ADR-0006).
+fastfetch is a read **dependency** installed via the mise baseline (ADR-0013/0007). If it isn't on PATH or fails, the command fails fast naming the dependency (ADR-0006). Load averages aren't a fastfetch module, so they're read separately from `uptime` (best-effort: if `uptime` fails, `load` is simply omitted).
 
 ### Exit codes
 
@@ -69,6 +69,7 @@ There is no `1`/`2`: this command makes no in-sync/outdated judgement, it just r
   "disks": [ { "name": "Macintosh HD", "mountpoint": "/", "total_bytes": 494384795648, "used_bytes": 465891303424 } ],
   "battery": { "capacity": 80.0, "cycle_count": 92, "status": ["AC Connected"] },
   "network": [ { "interface": "en0", "ipv4": "192.168.1.20" } ],
+  "load": [2.34, 2.10, 1.98],
   "uptime": { "boot_time": "2026-06-08T08:14:09-04:00" }
 }
 ```
@@ -82,22 +83,22 @@ There is no `1`/`2`: this command makes no in-sync/outdated judgement, it just r
 
 The dashboard gains a passive **system-info header band** between the title header and the panes — three compact lines, each truncated to the terminal width, drawn from the same `sysinfo` snapshot (loaded asynchronously alongside the status report; shows `system: loading…` until it lands):
 
-1. **Identity** — host model · OS pretty name · kernel arch
-2. **Compute** — CPU · cores · GPU · memory · root-disk used/total
-3. **Power/net** — battery (% · cycles · status) · local IPv4 · uptime
+1. **Identity** — OS pretty name (leading, so it survives truncation) · host model · kernel arch
+2. **Compute** — CPU · cores · GPU · memory (used/total/free) · root-disk used/total
+3. **Runtime** — load averages · swap (used/total/free) · battery (% · cycles · status) · local IPv4 · uptime
 
 It is informational and has no keybinding; it does not change the verdict badge. If fastfetch is unavailable the band shows a single `system: fastfetch unavailable` line (padded so the layout never shifts). Narrow and small-terminal fallbacks keep a condensed line.
 
 ## Acceptance criteria
 
-- [ ] `myplace sysinfo --json | jq .` succeeds; exactly one document on stdout; contains `schema`, `machine`, `checked_at`, and the curated sections.
-- [ ] `myplace sysinfo` (no flag) prints a readable block including OS+version, host model, CPU, GPU, memory, and **disk** usage.
-- [ ] Cosmetic fields (shell, terminal, terminal font, theme, icons, locale) are **not** present in either output.
-- [ ] Absent modules degrade gracefully (a machine without a battery/GPU still succeeds, exit `0`).
-- [ ] With fastfetch not on PATH, the command exits `3` with a message naming fastfetch; `status`/drift are unaffected.
-- [ ] `myplace help --json`/`--llm` lists `sysinfo` with its exit codes and this doc as its output schema.
-- [ ] The dashboard shows the three-line system-info band; the layout stays intact while it loads, when fastfetch is unavailable, and across wide/narrow/small terminals.
-- [ ] fastfetch is in the mise baseline so a freshly-`update`d machine has it.
+- [x] `myplace sysinfo --json | jq .` succeeds; exactly one document on stdout; contains `schema`, `machine`, `checked_at`, and the curated sections.
+- [x] `myplace sysinfo` (no flag) prints a readable block including OS+version, host model, CPU, GPU, memory, and **disk** usage.
+- [x] Cosmetic fields (shell, terminal, terminal font, theme, icons, locale) are **not** present in either output.
+- [x] Absent modules degrade gracefully (a machine without a battery/GPU still succeeds, exit `0`).
+- [x] With fastfetch not on PATH, the command exits `3` with a message naming fastfetch; `status`/drift are unaffected.
+- [x] `myplace help --json`/`--llm` lists `sysinfo` with its exit codes and this doc as its output schema.
+- [x] The dashboard shows the three-line system-info band; the layout stays intact while it loads, when fastfetch is unavailable, and across wide/narrow/small terminals (a regression test asserts it fills the height exactly).
+- [x] fastfetch is in the mise baseline so a freshly-`update`d machine has it.
 
 ## Open questions
 
