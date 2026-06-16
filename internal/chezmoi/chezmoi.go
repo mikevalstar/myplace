@@ -6,12 +6,16 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/mikevalstar/myplace/internal/run"
 )
+
+// dottedVersion matches the first "X.Y.Z" in a tool's --version banner.
+var dottedVersion = regexp.MustCompile(`\d+\.\d+\.\d+`)
 
 type Client struct {
 	r run.Runner
@@ -47,6 +51,33 @@ func (c *Client) Initialized(ctx context.Context) bool {
 	}
 	entries, err := os.ReadDir(p)
 	return err == nil && len(entries) > 0
+}
+
+// Version returns chezmoi's version as a dotted number ("2.70.5"), parsed from
+// `chezmoi --version` (banner: "chezmoi version v2.70.5, commit ..."). Empty
+// string if the banner has no recognizable version.
+func (c *Client) Version(ctx context.Context) (string, error) {
+	out, err := c.cz(ctx, "--version")
+	if err != nil {
+		return "", err
+	}
+	return dottedVersion.FindString(string(out)), nil
+}
+
+// RemoteURL is the origin URL of the dotfiles source repo (empty if unset).
+func (c *Client) RemoteURL(ctx context.Context) (string, error) {
+	out, err := c.cz(ctx, "git", "--", "remote", "get-url", "origin")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// LsRemote contacts the source repo's origin (network) without changing
+// anything — a read-only reachability probe for `doctor`.
+func (c *Client) LsRemote(ctx context.Context) error {
+	_, err := c.cz(ctx, "git", "--", "ls-remote", "--exit-code", "origin", "HEAD")
+	return err
 }
 
 // Profile returns the machine profile from chezmoi's template data

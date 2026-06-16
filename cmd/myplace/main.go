@@ -40,7 +40,11 @@ func main() {
 			filepath.Join(home, ".local", "bin"),
 			filepath.Join(dataHome, "mise", "shims"),
 		}, string(os.PathListSeparator))
-		os.Setenv("PATH", prepend+string(os.PathListSeparator)+os.Getenv("PATH"))
+		// Stash the user's real PATH before augmenting it, so `doctor` can check
+		// what their shell actually resolves rather than this prepended copy.
+		orig := os.Getenv("PATH")
+		os.Setenv("MYPLACE_ORIG_PATH", orig)
+		os.Setenv("PATH", prepend+string(os.PathListSeparator)+orig)
 	}
 
 	// Persistent debug trace to <state-dir>/myplace.log (ADR-0005). Tag the
@@ -126,6 +130,7 @@ func newRootCmd(r run.Runner, ch *chezmoi.Client, ms *mise.Client) *cobra.Comman
 	root.SetHelpCommand(newHelpCmd())
 	root.AddCommand(
 		newStatusCmd(ch, ms),
+		newDoctorCmd(ch, ms),
 		newOutdatedCmd(sources...),
 		newSysinfoCmd(r),
 		newUpdateCmd(ch, ms),

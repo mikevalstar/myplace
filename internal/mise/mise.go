@@ -8,9 +8,14 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/mikevalstar/myplace/internal/run"
 )
+
+// dottedVersion matches the first "X.Y.Z" in mise's version banner
+// ("2026.6.10 macos-arm64 (2026-06-14)").
+var dottedVersion = regexp.MustCompile(`\d+\.\d+\.\d+`)
 
 type Client struct {
 	r    run.Runner
@@ -25,6 +30,16 @@ func New(r run.Runner) *Client {
 func (c *Client) Installed(ctx context.Context) bool {
 	_, err := c.r.Run(ctx, c.home, "mise", "version")
 	return err == nil
+}
+
+// Version returns mise's version as a dotted number ("2026.6.10"), parsed from
+// `mise version`. Empty string if the banner has no recognizable version.
+func (c *Client) Version(ctx context.Context) (string, error) {
+	out, err := c.r.Run(ctx, c.home, "mise", "version")
+	if err != nil {
+		return "", err
+	}
+	return dottedVersion.FindString(string(out)), nil
 }
 
 // Tool is one entry from `mise ls --json`.

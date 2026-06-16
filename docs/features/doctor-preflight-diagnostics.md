@@ -1,8 +1,8 @@
 ---
 title: Preflight diagnostics (myplace doctor)
-status: draft
+status: active
 created: 2026-06-13
-updated: 2026-06-13
+updated: 2026-06-16
 tags: [cli, diagnostics, troubleshooting, headless]
 phase: 1
 ---
@@ -113,13 +113,17 @@ So a provisioning script can `myplace doctor --json || exit` before attempting w
 - [ ] One failing check does not prevent the others from running; a single invocation reports every problem found.
 - [ ] Every `fail` includes a concrete remedy (command or config line) naming the specific value (path, URL) involved.
 - [ ] `myplace doctor --json | jq .` emits exactly one document; logs go to stderr.
-- [ ] Exit code is 1 when any check fails, 0 when only warnings or passes remain.
-- [ ] Reachability checks degrade to `warn`/exit 2 when offline rather than reporting `fail`.
+- [ ] Exit code is 1 when any check fails; 2 when nothing failed but a check could not complete (a warning); 0 only when every check passed.
+- [ ] Reachability checks degrade to `warn`/exit 2 when offline rather than reporting `fail` — being offline isn't broken, so it never yields exit 1.
 - [ ] Lives in the core packages with no TUI imports (ADR-0002); reuses the `run.Runner` choke point so every probe is logged.
+
+## Resolved
+
+- **Version floors:** pinned explicit, low floors recorded next to the check in `internal/doctor` (`chezmoi 2.0.0`, `mise 2024.1.0`) — the versions below which myplace's own invocations break, not a "stay current" nudge (that's `status`/`outdated`). Below floor is `fail` with the upgrade remedy; installed-but-unparseable degrades to `warn`, never a false `fail`.
+- **Exit semantics:** `fail` present → exit 1; otherwise any `warn` (a check that couldn't complete, e.g. offline) → exit 2; all pass → exit 0. Matches the tool-wide 0/1/2 convention. A gating script that wants to proceed offline should branch on `verdict != "fail"` rather than `|| exit`, since exit 2 is "couldn't verify everything," not "broken."
 
 ## Open questions
 
-- Minimum supported chezmoi/mise versions: pin explicit floors, or just warn on "very old"? Leaning explicit floors recorded next to the check.
 - Should bootstrap call `doctor` automatically at the end as its self-verification step, replacing the ad-hoc final status report? (Would unify "did bootstrap actually work" with this command.)
 - A future `--fix` for the safe, unambiguous remedies (PATH line, `chezmoi upgrade`) — opt-in only; tracked separately if pursued.
 

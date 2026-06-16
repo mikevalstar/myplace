@@ -34,6 +34,7 @@ const (
 	exitCodesConverge = "0=success;1=completed with per-item failures;3=error, or a needed decision was not supplied non-interactively"
 	exitCodesOutdated = "0=all current;1=outdated packages available;3=error (no source could be queried)"
 	exitCodesSysinfo  = "0=success;3=error (fastfetch unavailable or failed)"
+	exitCodesDoctor   = "0=ready;1=a check failed (machine not ready);2=checks incomplete (e.g. offline);3=error"
 
 	// The canonical, tool-wide table (the union across commands) advertised at
 	// the top of the manifest and brief; matches the headless CLI spec.
