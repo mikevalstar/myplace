@@ -2,7 +2,7 @@
 title: Update a machine
 status: active
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-06-16
 tags: [update, drift, chezmoi, mise]
 actors: [user, tui, chezmoi, mise]
 ---
@@ -30,10 +30,18 @@ The update screen presents drift grouped into the four buckets below; the user c
    Then commit and push captured changes: `chezmoi git -- add -A`, `chezmoi git -- commit` (message prompt with sensible default), `chezmoi git -- push`.
 
    **Known limitation — templated files:** `chezmoi re-add` cannot reverse a rendered file back into a `.tmpl` source, so for a templated managed file (e.g. the mise config) it silently leaves the template unchanged and the edit is *not* captured. The capture flow detects this (the file is still modified after re-add) and tells the user to edit the source template directly (`chezmoi edit <file>`) and commit in the source repo. Doing so is the correct way to change a templated dotfile and preserves its conditionals. Smarter handling (offering `chezmoi edit`, or diffing into the template) is future work.
-2. **Pull incoming dotfiles.** `chezmoi update` (pull --rebase + apply; rebase keeps just-captured local commits on top). Before applying, the step checks for managed files that still have local edits (any the user skipped, or — in headless runs — all of them, since capture never runs there). If any remain, the apply is **skipped, not attempted**: a bare `chezmoi apply` would prompt to overwrite them and, with no TTY, abort with a cryptic error. Instead the step reports `not applied — local edits to <files>; <how to resolve>` and the rest of the update (tools) proceeds. The files stay as drift for an interactive `myplace update` to keep or discard.
-3. **Update tools.** `mise install` (anything missing), then `mise upgrade` for tools outdated against the just-updated config. `mise up --bump`-style config-version bumps are a deliberate, separate action — updating a machine should converge it on the shared config, not mutate the shared config as a side effect.
-4. **Update myplace itself. (🚧 not yet built — planned.)** If a newer release exists, download the new binary and swap in place (`myplace self-update`); prompt to restart the TUI. Today `self-update` is a separate command, not folded into the update flow; `status` flags a stale binary.
-5. **Re-run status and show the closing dashboard — ideally all green. (🚧 not yet built — planned.)** The headless `update` reports its per-step result (see below) and exits; it does not recompute and print a closing status. Run `myplace status` after to confirm.
+2. **Pull incoming dotfiles.** `chezmoi git -- pull --rebase` updates the source repo without touching target files. Rebase keeps just-captured local commits on top.
+3. **Review and apply incoming dotfiles.** Before applying, the step checks for managed files that still have local edits (any the user skipped, or — in headless runs — all of them, since capture never runs there). If any remain, the apply is **skipped, not attempted**: a bare `chezmoi apply` would prompt to overwrite them and, with no TTY, abort with a cryptic error. Instead the step reports `not applied — local edits to <files>; <how to resolve>` and the rest of the update (tools) proceeds. The files stay as drift for an interactive `myplace update` to keep or discard.
+
+   In an interactive run, after the pull and before any apply, `myplace` walks every file where `chezmoi status` says apply would change the target. For each file it shows `chezmoi diff <target>` and asks:
+   - **apply** → `chezmoi apply <file>` for that file only
+   - **skip** → leave the file as drift for a later run
+   - **abort dotfiles apply** → stop before reviewing later files
+
+   If any incoming file is skipped, the apply step reports partial success and exits 1 after applying the files already approved; tools still proceed. In headless `--yes` mode there is no review channel, so after the local-edit safety check it applies all incoming dotfiles with `chezmoi apply`.
+4. **Update tools.** `mise install` (anything missing), then `mise upgrade` for tools outdated against the just-updated config. `mise up --bump`-style config-version bumps are a deliberate, separate action — updating a machine should converge it on the shared config, not mutate the shared config as a side effect.
+5. **Update myplace itself. (🚧 not yet built — planned.)** If a newer release exists, download the new binary and swap in place (`myplace self-update`); prompt to restart the TUI. Today `self-update` is a separate command, not folded into the update flow; `status` flags a stale binary.
+6. **Re-run status and show the closing dashboard — ideally all green. (🚧 not yet built — planned.)** The headless `update` reports its per-step result (see below) and exits; it does not recompute and print a closing status. Run `myplace status` after to confirm.
 
 Decision points worth noting:
 
@@ -48,7 +56,8 @@ Decision points worth noting:
 {
   "schema": 1,
   "steps": [
-    { "name": "chezmoi update", "ok": true },
+    { "name": "chezmoi pull", "ok": true },
+    { "name": "chezmoi apply", "ok": true },
     { "name": "mise install", "ok": true },
     { "name": "mise upgrade", "ok": false, "error": "node: download failed" }
   ],
@@ -67,7 +76,8 @@ Machine matches the shared config, local improvements are committed and pushed (
 | What can go wrong | How the user finds out | Recovery |
 |-------------------|------------------------|----------|
 | Pull rebase conflict | step 2 reports git's conflict output and exits 1 | resolve by hand in the source dir, re-run update (🚧 planned: `tea.ExecProcess` shell hand-off) |
-| `chezmoi apply` conflicts with unexpected local file | the step detects remaining local edits and **skips** the apply, reporting the files (it never prompts) | keep/discard them via interactive `myplace update` (🚧 planned: per-file keep/overwrite choice, same as bootstrap) |
+| User skips incoming files during review | step 3 reports partial success after applying approved files | re-run interactive `myplace update` and apply or keep skipping the remaining files |
+| `chezmoi apply` conflicts with unexpected local file | the step detects remaining local edits and **skips** the apply, reporting the files (it never prompts) | keep/discard them via interactive `myplace update` |
 | Push rejected (non-fast-forward) | step 1 push error shown | re-run after a manual pull --rebase (🚧 planned: TUI offers pull-rebase-retry once) |
 | Tool download/build fails | per-tool failure list in step 3, `verdict: "partial"` | continue others; failures remain visible in status |
 | Self-update swap fails (permissions) | `self-update` error with the path | instructs re-run of installer one-liner |

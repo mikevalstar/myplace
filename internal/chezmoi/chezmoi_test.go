@@ -29,6 +29,45 @@ func TestInitApplyArgs(t *testing.T) {
 	}
 }
 
+func TestPullAndApplyArgs(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name string
+		run  func(*Client) error
+		want string
+	}{
+		{
+			name: "pull",
+			run:  func(c *Client) error { return c.Pull(ctx) },
+			want: "chezmoi --no-tty git -- pull --rebase",
+		},
+		{
+			name: "apply all",
+			run:  func(c *Client) error { return c.Apply(ctx) },
+			want: "chezmoi --no-tty apply",
+		},
+		{
+			name: "apply target",
+			run:  func(c *Client) error { return c.ApplyTarget(ctx, "/Users/me/.zshrc") },
+			want: "chezmoi --no-tty apply /Users/me/.zshrc",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &fakeRunner{}
+			c := New(f)
+			if err := tt.run(c); err != nil {
+				t.Fatal(err)
+			}
+			if got := strings.Join(f.args, " "); got != tt.want {
+				t.Errorf("args:\n got: %s\nwant: %s", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseStatus(t *testing.T) {
 	out := []byte(" M .zshrc\nMM .config/mise/config.toml\n A .config/new\n\n")
 	files := ParseStatus(out)

@@ -32,11 +32,12 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Pull and apply dotfiles, install and upgrade tools",
-		Long: "Converges this machine on the shared config: chezmoi update (pull + apply),\n" +
+		Long: "Converges this machine on the shared config: pull + apply dotfiles,\n" +
 			"then mise install + upgrade. Interactively, it first walks any local edits to\n" +
-			"managed files so you can keep (re-add + push) or discard them. Headless\n" +
-			"(--yes) never captures or overwrites local edits — it reports them and skips\n" +
-			"the dotfiles apply, leaving the rest of the update to proceed.",
+			"managed files so you can keep (re-add + push) or discard them, then shows\n" +
+			"per-file diffs for incoming dotfile changes before applying them. Headless\n" +
+			"(--yes) never captures local edits — it reports them and skips the dotfiles\n" +
+			"apply, leaving the rest of the update to proceed.",
 		Annotations: map[string]string{
 			annHeadless:     "myplace update --yes --json",
 			annRequired:     "yes",
@@ -59,7 +60,7 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 				var ok bool
 				err := huh.NewConfirm().
 					Title("Update this machine?").
-					Description("capture local edits, chezmoi update (pull + apply), then mise install + upgrade").
+					Description("capture local edits, pull + review/apply dotfiles, then mise install + upgrade").
 					Value(&ok).Run()
 				if err != nil || !ok {
 					fmt.Fprintln(os.Stderr, "aborted")
@@ -80,7 +81,7 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 			doTools := !dotfilesOnly
 
 			var steps []stepResult
-			step := func(name string, fn func() error) {
+			step := func(name string, fn func() error) bool {
 				err := fn()
 				res := stepResult{Name: name, OK: err == nil}
 				if err != nil {
@@ -97,15 +98,16 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 					fmt.Fprintf(os.Stderr, "%-16s %s\n", name, mark)
 				}
 				steps = append(steps, res)
+				return err == nil
 			}
 
 			if doDotfiles {
-				// `chezmoi update` (pull + apply) aborts on a managed file that
-				// has uncaptured local edits — apply would overwrite it, so
-				// chezmoi prompts, and with no TTY that prompt fails. Detect
-				// that up front and report it plainly instead of letting it
-				// surface as a cryptic "EOF". Capturing (keep/discard) is the
-				// resolution; in headless runs it must be done interactively.
+				// Applying aborts on a managed file that has uncaptured local
+				// edits — apply would overwrite it, so chezmoi prompts, and
+				// with no TTY that prompt fails. Detect that up front and
+				// report it plainly instead of letting it surface as a cryptic
+				// "EOF". Capturing (keep/discard) is the resolution; in
+				// headless runs it must be done interactively.
 				if mods := localModified(ctx, ch); len(mods) > 0 {
 					var hint string
 					if yes {
@@ -116,11 +118,21 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 					msg := fmt.Sprintf("not applied — local edits to %s; %s", strings.Join(mods, ", "), hint)
 					logger.Error("update dotfiles skipped (local edits)", "files", strings.Join(mods, ","))
 					if !jsonOut {
-						fmt.Fprintf(os.Stderr, "%-16s SKIPPED: %s\n", "chezmoi update", msg)
+						fmt.Fprintf(os.Stderr, "%-16s SKIPPED: %s\n", "chezmoi apply", msg)
 					}
-					steps = append(steps, stepResult{Name: "chezmoi update", OK: false, Error: msg})
+					steps = append(steps, stepResult{Name: "chezmoi apply", OK: false, Error: msg})
 				} else {
-					step("chezmoi update", func() error { return ch.Update(ctx) })
+					if step("chezmoi pull", func() error { return ch.Pull(ctx) }) {
+						step("chezmoi apply", func() error {
+							if mods := localModified(ctx, ch); len(mods) > 0 {
+								return fmt.Errorf("not applied — local edits to %s; run `myplace update` (interactive) to keep or discard them", strings.Join(mods, ", "))
+							}
+							if yes {
+								return ch.Apply(ctx)
+							}
+							return reviewAndApplyIncoming(ctx, ch)
+						})
+					}
 				}
 			}
 			if doTools {
@@ -176,6 +188,72 @@ func contains(xs []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// reviewAndApplyIncoming shows the diff for every file that `chezmoi apply`
+// would change after the source repo has been pulled, then applies only the
+// files the user approves. Headless runs intentionally bypass this and apply
+// everything, because there is no decision channel.
+func reviewAndApplyIncoming(ctx context.Context, ch *chezmoi.Client) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	files, err := ch.Status(ctx)
+	if err != nil {
+		return fmt.Errorf("chezmoi status: %w", err)
+	}
+
+	var incoming []chezmoi.FileStatus
+	for _, f := range files {
+		if f.ApplyChanges {
+			incoming = append(incoming, f)
+		}
+	}
+	if len(incoming) == 0 {
+		fmt.Fprintln(os.Stderr, "chezmoi apply    no incoming dotfile changes")
+		return nil
+	}
+
+	applied, skipped := 0, 0
+	for _, f := range incoming {
+		target := filepath.Join(home, f.Path)
+		// Show the exact target-file patch before asking whether to apply it.
+		if diff, err := ch.Diff(ctx, target); err == nil && strings.TrimSpace(diff) != "" {
+			fmt.Fprintf(os.Stderr, "\n── %s (incoming change to apply) ──\n%s\n", f.Path, diff)
+		} else {
+			fmt.Fprintf(os.Stderr, "\n── %s (incoming change) ──\n", f.Path)
+		}
+
+		var choice string
+		err := huh.NewSelect[string]().
+			Title(f.Path).
+			Options(
+				huh.NewOption("apply — repo wins for this file", "apply"),
+				huh.NewOption("skip — leave this file for later", "skip"),
+				huh.NewOption("abort dotfiles apply", "abort"),
+			).Value(&choice).Run()
+		if err != nil {
+			return err
+		}
+
+		switch choice {
+		case "apply":
+			if err := ch.ApplyTarget(ctx, target); err != nil {
+				return fmt.Errorf("apply %s: %w", f.Path, err)
+			}
+			applied++
+		case "skip":
+			skipped++
+		case "abort":
+			return fmt.Errorf("incoming dotfiles apply aborted at %s", f.Path)
+		}
+	}
+
+	if skipped > 0 {
+		return fmt.Errorf("applied %d incoming file(s), skipped %d; re-run update to finish dotfiles", applied, skipped)
+	}
+	return nil
 }
 
 // captureOutgoing walks locally-modified managed files and lets the user

@@ -175,11 +175,29 @@ func (c *Client) Update(ctx context.Context) error {
 	return err
 }
 
+// Pull updates the source repo without applying it to the target files.
+func (c *Client) Pull(ctx context.Context) error {
+	_, err := c.cz(ctx, "git", "--", "pull", "--rebase")
+	return err
+}
+
+// Apply applies the current source state to all managed target files.
+func (c *Client) Apply(ctx context.Context) error {
+	_, err := c.cz(ctx, "apply")
+	return err
+}
+
 // Diff shows what `chezmoi apply` would change for one target (absolute path).
 // For a locally-modified file this is the change that would UNDO the local edit.
 func (c *Client) Diff(ctx context.Context, target string) (string, error) {
 	out, err := c.cz(ctx, "diff", target)
 	return string(out), err
+}
+
+// ApplyTarget applies the current source state to one managed target file.
+func (c *Client) ApplyTarget(ctx context.Context, target string) error {
+	_, err := c.cz(ctx, "apply", target)
+	return err
 }
 
 // ReAdd captures the local state of a target back into the source repo
