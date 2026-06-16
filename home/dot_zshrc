@@ -30,6 +30,10 @@ export MYPLACE_INTERACTIVE_SHELL
 # Local bin first on PATH (myplace, fnm, rustup, and friends install here).
 export PATH="$HOME/.local/bin:$PATH"
 
+# myplace-managed helper scripts (chezmoi, see ADR-0014). Kept out of ~/.local/bin
+# so they don't mingle with mise/installer binaries — run `mv_scripts` to list them.
+[ -d "$HOME/.mvscripts" ] && export PATH="$HOME/.mvscripts:$PATH"
+
 # mise — activate so mise-managed CLI tools are on PATH.
 command -v mise >/dev/null 2>&1 && eval "$(mise activate zsh)"
 

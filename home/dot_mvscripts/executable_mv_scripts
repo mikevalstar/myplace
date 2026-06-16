@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# mv_scripts — list the myplace-managed helper scripts in ~/.local/bin.
+# mv_scripts — list the myplace-managed helper scripts in ~/.mvscripts.
 # mv_scripts: list all managed helper scripts and what they do
 #
-# Managed by myplace (chezmoi) — edit at home/dot_local/bin/executable_mv_scripts
-# in the repo, not at ~/.local/bin/mv_scripts. See docs/adrs/0014.
+# Managed by myplace (chezmoi) — edit at home/dot_mvscripts/executable_mv_scripts
+# in the repo, not at ~/.mvscripts/mv_scripts. See docs/adrs/0014.
 #
-# Discovery is by convention: any script in ~/.local/bin whose body contains a
+# Discovery is by convention: any script in ~/.mvscripts whose body contains a
 # line "# mv_scripts: <description>" is listed here, using that text. Add the
 # marker to a new script and it shows up automatically.
 #
@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-BIN_DIR="${MV_SCRIPTS_DIR:-$HOME/.local/bin}"
+SCRIPTS_DIR="${MV_SCRIPTS_DIR:-$HOME/.mvscripts}"
 MARKER="# mv_scripts:"
 
 usage() { sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; }
@@ -33,10 +33,11 @@ esac
 
 # Collect "name<TAB>description" rows from every marked script, sorted by name.
 rows=()
-if [ -d "$BIN_DIR" ]; then
-  for f in "$BIN_DIR"/*; do
+if [ -d "$SCRIPTS_DIR" ]; then
+  for f in "$SCRIPTS_DIR"/*; do
     [ -f "$f" ] || continue
-    line=$(grep -m1 -F "$MARKER" "$f" 2>/dev/null) || continue
+    # -I skips binary files instantly, so a stray binary in the dir won't stall the scan.
+    line=$(grep -m1 -I -F "$MARKER" "$f" 2>/dev/null) || continue
     desc=${line#*"$MARKER"}
     desc="${desc#"${desc%%[![:space:]]*}"}"   # trim leading whitespace
     [ -n "$desc" ] || continue
@@ -64,7 +65,7 @@ if $json; then
 fi
 
 if [ "${#rows[@]}" -eq 0 ]; then
-  echo "No managed scripts found in $BIN_DIR."
+  echo "No managed scripts found in $SCRIPTS_DIR."
   exit 1
 fi
 

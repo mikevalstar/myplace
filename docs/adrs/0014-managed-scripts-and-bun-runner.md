@@ -39,13 +39,22 @@ A top-level `scripts/` dir, like `mise.toml`, holding maintenance tooling for th
 project. Simple, but it never reaches the machines — you'd have to clone the repo to
 run anything. Wrong home for fleet-wide helpers; these aren't *this app's* dev tooling.
 
-### Option B — Deploy scripts as chezmoi-managed files on `PATH`
+### Option B — Deploy scripts into the shared `~/.local/bin`
 
 Source them under `home/dot_local/bin/` (chezmoi target `~/.local/bin`, already on
-`PATH` via `dot_zshrc`). Mark them executable with chezmoi's `executable_` prefix.
-They land on every machine through the normal `myplace update` flow, show up in drift
-status like any other managed file, and are runnable by name (`ai_installed`). This is
-the same deploy mechanism every other dotfile already uses — no new machinery.
+`PATH`). Works, but `~/.local/bin` is where mise, chezmoi, and other installers drop
+their (often hundreds of MB of) binaries — so our scripts mingle with tooling we don't
+own, and anything that wants to enumerate "our" scripts has to sift the whole directory.
+`mv_scripts` scanning that folder for a marker meant grepping through ~400 MB of binaries
+(≈8 s on a real machine). Wrong neighborhood.
+
+### Option C — Deploy into a dedicated `~/.mvscripts` on `PATH`
+
+Source them under `home/dot_mvscripts/` (chezmoi target `~/.mvscripts`), marked
+executable with chezmoi's `executable_` prefix, with `~/.mvscripts` prepended to `PATH`
+in `dot_zshrc`. Same chezmoi deploy/drift mechanism as any dotfile and runnable by name
+(`ai_installed`), but the directory holds *only our scripts* — no collision with mise's
+binaries, and `mv_scripts` enumerates a handful of small files instantly.
 
 ### Runtime — shell by default, bun when a script needs it
 
@@ -59,10 +68,13 @@ the same deploy mechanism every other dotfile already uses — no new machinery.
 ## Decision
 
 Helper scripts that belong on every machine are **chezmoi-managed files under
-`home/dot_local/bin/`** (Option B), executable via the `executable_` prefix, invoked by
-name off `PATH`. This keeps repo-dev tooling (`mise.toml` tasks), provisioning
-(`.chezmoiscripts/`), and fleet helpers (`~/.local/bin`) as three clearly separate
-things.
+`home/dot_mvscripts/`** (Option C), deployed to a dedicated `~/.mvscripts` dir,
+executable via the `executable_` prefix, and invoked by name off `PATH` (`dot_zshrc`
+prepends `~/.mvscripts`). The dedicated dir keeps our scripts from mingling with the
+installer/mise binaries in `~/.local/bin` and lets `mv_scripts` enumerate them cheaply.
+This keeps four script homes clearly separate: repo-dev tooling (`mise.toml` tasks),
+provisioning (`.chezmoiscripts/`), third-party binaries (`~/.local/bin`), and our fleet
+helpers (`~/.mvscripts`).
 
 Write each script in **plain shell by default**; reach for **bun** only when a script
 genuinely needs a runtime. bun is added to the global mise tool set so it's available
@@ -70,20 +82,22 @@ fleet-wide as a runner when wanted.
 
 The collection stays self-documenting by **convention, not a manifest**: a script opts
 into the index by carrying a `# mv_scripts: <one-line description>` comment in its body.
-`mv_scripts` scans `~/.local/bin` for that marker and renders the name + description as a
+`mv_scripts` scans `~/.mvscripts` for that marker and renders the name + description as a
 table (via `gum`, already in the tool set; plain columns when `gum` is absent). Adding a
 marked script makes it show up automatically — there's no list to keep in sync.
 
 ## Consequences
 
-- Easier: a new helper is just a file under `home/dot_local/bin/`; it deploys, versions,
+- Easier: a new helper is just a file under `home/dot_mvscripts/`; it deploys, versions,
   and drift-checks through the existing flow with zero new tooling. bun is available
   everywhere for the scripts that want it.
-- Harder / to watch: `~/.local/bin` helpers are *unmanaged by mise/brew* — they're our
+- Harder / to watch: `~/.mvscripts` helpers are *unmanaged by mise/brew* — they're our
   code, so we own their portability (`$HOME` not `/Users/...`, guard against missing
   deps). Shell scripts must stay POSIX-safe enough for the headless Linux servers.
+- A new `~/.mvscripts` `PATH` entry is owned by `dot_zshrc`; non-zsh shells won't see the
+  scripts on `PATH` unless they replicate it (acceptable — the fleet is zsh).
 - bun now installs on every machine including servers. It's a small single binary, but
   if a future server profile wants a leaner tool set, bun is a candidate to gate behind
   a profile check in the mise config.
 - Follow-up: the [managed-setup guide](../guides/managed-setup.md) documents the
-  `home/dot_local/bin/` path and the shell-vs-bun choice as the how-to.
+  `home/dot_mvscripts/` path and the shell-vs-bun choice as the how-to.

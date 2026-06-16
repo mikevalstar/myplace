@@ -18,7 +18,7 @@ Where things live and how to add a new tool, dotfile, or provisioning step so it
 | Path | What it is |
 |------|------------|
 | `dot_config/mise/config.toml.tmpl` | The mise tool set — every machine's CLI tools/runtimes from mise's registry |
-| `dot_local/bin/executable_*` | Helper scripts deployed to `~/.local/bin` (on `PATH`), runnable by name on every machine ([ADR-0014](../adrs/0014-managed-scripts-and-bun-runner.md)) |
+| `dot_mvscripts/executable_*` | Helper scripts deployed to a dedicated `~/.mvscripts` (on `PATH`), runnable by name on every machine; `mv_scripts` lists them ([ADR-0014](../adrs/0014-managed-scripts-and-bun-runner.md)) |
 | `.chezmoiscripts/run_onchange_provision.sh` | Idempotent installer for the things mise can't own — git, oh-my-zsh + plugins, rustup, fnm, plain OS/brew packages via `ensure_tool` (httpie, mosh), and macOS-only fonts/GUI casks via `ensure_cask` |
 | `dot_zshrc` | The managed `~/.zshrc` — oh-my-zsh setup, mise activation, tool env wiring |
 | `dot_gitconfig.tmpl` | Git identity (`~/.gitconfig`) — name/email, rendered from install-time data (`.gitName`/`.gitEmail`) |
@@ -75,16 +75,18 @@ Find the exact name with `brew search /<name>/`. Nerd Fonts are `font-<family>-n
 ### A helper script on every machine
 
 For a standalone utility you want on `PATH` on every box (not dev tooling for this
-repo, and not a provisioning step) — drop it under `home/dot_local/bin/` with the
-`executable_` prefix so chezmoi marks it `+x`. It deploys to `~/.local/bin/<name>`
-(already on `PATH` via `dot_zshrc`) through the normal `myplace update` flow and is
-invoked by name (`home/dot_local/bin/executable_ai_installed` → `ai_installed`).
+repo, and not a provisioning step) — drop it under `home/dot_mvscripts/` with the
+`executable_` prefix so chezmoi marks it `+x`. It deploys to `~/.mvscripts/<name>`
+(a dedicated dir prepended to `PATH` in `dot_zshrc`, kept separate from `~/.local/bin`
+so our scripts don't mingle with mise/installer binaries) through the normal
+`myplace update` flow and is invoked by name
+(`home/dot_mvscripts/executable_ai_installed` → `ai_installed`).
 
 - **Default to plain shell**; reach for `bun` (a managed tool — `core:bun` in mise) only
   when a script needs TypeScript, real arg parsing, or JSON it'd be painful to emit from
   bash. Rationale and the shell-vs-bun split: [ADR-0014](../adrs/0014-managed-scripts-and-bun-runner.md).
 - **Make it discoverable:** add a `# mv_scripts: <one-line description>` comment to the
-  script body (avoid `|` in the text). `mv_scripts` scans `~/.local/bin` for that marker
+  script body (avoid `|` in the text). `mv_scripts` scans `~/.mvscripts` for that marker
   and lists every marked script with its description in a table — so a new helper shows
   up automatically, no list to maintain.
 - You own portability: use `$HOME` not `/Users/<you>`, guard against missing deps, and
