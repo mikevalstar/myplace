@@ -5,7 +5,10 @@
 # ---- oh-my-zsh ----
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="robbyrussell"
-plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
+# Built-in omz plugins add completions/aliases for tools we use (gh, go,
+# rustup, fnm) plus QoL (extract, Esc-Esc sudo, colored man pages). Keep
+# zsh-syntax-highlighting LAST — it must load after everything else.
+plugins=(git gh golang rust fnm extract sudo colored-man-pages zsh-autosuggestions zsh-syntax-highlighting)
 [ -f "$ZSH/oh-my-zsh.sh" ] && source "$ZSH/oh-my-zsh.sh"
 
 # ---- user configuration ----
