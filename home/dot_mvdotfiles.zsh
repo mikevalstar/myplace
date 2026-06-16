@@ -19,18 +19,21 @@ else
     echo "zoxide not found, and not setup" >&2
 fi
 
-## atuin
-if [[ -x "$(command -v atuin)" ]]; then
-    eval "$(atuin init zsh)"
-else
-    echo "atuin not found, and not setup" >&2
-fi
-
-## fzf
+## fzf — load BEFORE atuin on purpose. fzf's zsh init rebinds Ctrl-R to its own
+## history widget; whichever of fzf/atuin inits last owns Ctrl-R. We want atuin
+## to own both ↑ and Ctrl-R, so fzf goes first and atuin reclaims ^R below. fzf
+## still binds Ctrl-T (files) and Alt-C (dirs) independently, so those survive.
 if [[ -x "$(command -v fzf)" ]]; then
     source <(fzf --zsh)
 else
     echo "fzf not found, and not setup" >&2
+fi
+
+## atuin — must init AFTER fzf (see note above) so it owns ↑ and Ctrl-R.
+if [[ -x "$(command -v atuin)" ]]; then
+    eval "$(atuin init zsh)"
+else
+    echo "atuin not found, and not setup" >&2
 fi
 
 fi  # end interactive-only block
