@@ -26,6 +26,9 @@ fastfetch = "latest"
 d2 = "latest"
 git-lfs = "latest"
 tokei = "latest"
+# bun: JS/TS runtime used as a runner for some managed scripts (ADR-0014).
+# This is bun, not Node — Node stays with fnm (ADR-0007).
+bun = "latest"
 {{ if eq .chezmoi.os "linux" -}}
 # btop's only mise backend (aqua) ships linux binaries only; macOS gets it via
 # brew in run_onchange_provision.sh (ADR-0008).

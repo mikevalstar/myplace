@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# mv_scripts — list the myplace-managed helper scripts in ~/.local/bin.
+# mv_scripts: list all managed helper scripts and what they do
+#
+# Managed by myplace (chezmoi) — edit at home/dot_local/bin/executable_mv_scripts
+# in the repo, not at ~/.local/bin/mv_scripts. See docs/adrs/0014.
+#
+# Discovery is by convention: any script in ~/.local/bin whose body contains a
+# line "# mv_scripts: <description>" is listed here, using that text. Add the
+# marker to a new script and it shows up automatically.
+#
+# Usage:
+#   mv_scripts            pretty table (gum if available on a TTY, else plain)
+#   mv_scripts --json     machine-readable JSON array
+#   mv_scripts -h|--help  this help
+#
+# Exit: 0 if any scripts were found, 1 if none, 2 on usage error.
+
+set -euo pipefail
+
+BIN_DIR="${MV_SCRIPTS_DIR:-$HOME/.local/bin}"
+MARKER="# mv_scripts:"
+
+usage() { sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; }
+
+json=false
+case "${1:-}" in
+  --json) json=true ;;
+  -h|--help) usage; exit 0 ;;
+  "") ;;
+  *) echo "mv_scripts: unknown argument: $1" >&2; usage >&2; exit 2 ;;
+esac
+
+# Collect "name<TAB>description" rows from every marked script, sorted by name.
+rows=()
+if [ -d "$BIN_DIR" ]; then
+  for f in "$BIN_DIR"/*; do
+    [ -f "$f" ] || continue
+    line=$(grep -m1 -F "$MARKER" "$f" 2>/dev/null) || continue
+    desc=${line#*"$MARKER"}
+    desc="${desc#"${desc%%[![:space:]]*}"}"   # trim leading whitespace
+    [ -n "$desc" ] || continue
+    rows+=("$(basename "$f")	$desc")
+  done
+fi
+
+if [ "${#rows[@]}" -gt 0 ]; then
+  IFS=$'\n' rows=($(sort <<<"${rows[*]}")); unset IFS
+fi
+
+if $json; then
+  printf '['
+  first=true
+  for r in "${rows[@]}"; do
+    name=${r%%	*}; desc=${r#*	}
+    $first || printf ','
+    first=false
+    printf '\n  {"name":"%s","description":"%s"}' "$name" "$desc"
+  done
+  [ "${#rows[@]}" -gt 0 ] && printf '\n'
+  printf ']\n'
+  [ "${#rows[@]}" -gt 0 ]
+  exit
+fi
+
+if [ "${#rows[@]}" -eq 0 ]; then
+  echo "No managed scripts found in $BIN_DIR."
+  exit 1
+fi
+
+# Pretty output: gum static table when available, plain columns otherwise.
+if command -v gum >/dev/null 2>&1; then
+  for r in "${rows[@]}"; do
+    printf '%s|%s\n' "${r%%	*}" "${r#*	}"
+  done | gum table --separator '|' --columns 'Script,Description' --print
+else
+  printf '%-18s  %s\n' "SCRIPT" "DESCRIPTION"
+  for r in "${rows[@]}"; do
+    printf '%-18s  %s\n' "${r%%	*}" "${r#*	}"
+  done
+fi

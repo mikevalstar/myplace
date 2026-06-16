@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# ai_installed — report which AI CLI tools are present on this machine.
+# mv_scripts: report which AI CLI tools are installed on this machine
+#
+# Managed by myplace (chezmoi) — edit at home/dot_local/bin/executable_ai_installed
+# in the repo, not at ~/.local/bin/ai_installed. See docs/adrs/0014.
+#
+# Usage:
+#   ai_installed            human-readable report
+#   ai_installed --json     machine-readable JSON array
+#   ai_installed -h|--help  this help
+#
+# Exit: 0 if at least one tool is installed, 1 if none, 2 on usage error.
+
+set -euo pipefail
+
+# Tools to probe: "command|Display Name". Add new ones here.
+TOOLS=(
+  "claude|Claude Code"
+  "codex|OpenAI Codex CLI"
+  "gemini|Google Gemini CLI"
+  "cursor-agent|Cursor CLI"
+  "copilot|GitHub Copilot CLI"
+  "aider|Aider"
+  "opencode|opencode"
+  "crush|Charm Crush"
+  "goose|Block Goose"
+  "amp|Sourcegraph Amp"
+  "llm|llm (Simon Willison)"
+  "ollama|Ollama"
+  "q|Amazon Q"
+)
+
+usage() {
+  sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+json=false
+case "${1:-}" in
+  --json) json=true ;;
+  -h|--help) usage; exit 0 ;;
+  "") ;;
+  *) echo "ai_installed: unknown argument: $1" >&2; usage >&2; exit 2 ;;
+esac
+
+found=0
+total=${#TOOLS[@]}
+
+if $json; then
+  printf '['
+  first=true
+fi
+
+for entry in "${TOOLS[@]}"; do
+  cmd=${entry%%|*}
+  name=${entry#*|}
+  if path=$(command -v "$cmd" 2>/dev/null); then
+    installed=true
+    found=$((found + 1))
+  else
+    installed=false
+    path=""
+  fi
+
+  if $json; then
+    $first || printf ','
+    first=false
+    printf '\n  {"command":"%s","name":"%s","installed":%s,"path":"%s"}' \
+      "$cmd" "$name" "$installed" "$path"
+  else
+    if [ "$installed" = true ]; then
+      printf '  \033[32m✓\033[0m %-22s %s\n' "$cmd" "$path"
+    else
+      printf '  \033[2m✗ %-22s (not installed)\033[0m\n' "$cmd"
+    fi
+  fi
+done
+
+if $json; then
+  printf '\n]\n'
+else
+  echo
+  printf '%d of %d AI CLI tools installed.\n' "$found" "$total"
+fi
+
+[ "$found" -gt 0 ]

@@ -8,7 +8,8 @@
 
 # Local-only Claude settings
 .claude/settings.local.json
-bin/
 
-# Local build of the binary (release builds are CI-only)
+# Local build output (release builds are CI-only). Anchored to repo root so it
+# doesn't swallow chezmoi-managed scripts under home/dot_local/bin/.
+/bin/
 /myplace
