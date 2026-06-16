@@ -139,6 +139,24 @@ fi
 ensure_tool http httpie
 ensure_tool mosh mosh
 
+# nano: macOS ships `/usr/bin/nano` as a symlink to pico, which has no syntax
+# highlighting — so `command -v nano` is misleading and ensure_tool would skip
+# it. Install real GNU nano from brew-if-present explicitly (idempotent via
+# `brew list`). On Linux `nano` is already GNU nano; ensure it's present for
+# minimal/headless boxes. Highlighting is wired up by ~/.nanorc (dot_nanorc.tmpl).
+if [ "$(uname -s)" = "Darwin" ]; then
+	if command -v brew >/dev/null 2>&1; then
+		if ! brew list nano >/dev/null 2>&1; then
+			log "installing nano (brew; macOS /usr/bin/nano is pico, no highlighting)"
+			brew install nano || log "nano brew install failed"
+		fi
+	else
+		log "nano: no Homebrew on this Mac — run 'brew install nano' for GNU nano (system nano is pico)"
+	fi
+else
+	ensure_tool nano nano
+fi
+
 # btop's mise (aqua) package is linux-only, so mise installs it on the Linux
 # fleet; on macOS it comes from brew-if-present here instead (ADR-0008).
 [ "$(uname -s)" = "Darwin" ] && ensure_tool btop btop

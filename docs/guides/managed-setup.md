@@ -2,7 +2,7 @@
 title: Extending the managed setup (tools & dotfiles)
 status: active
 created: 2026-06-13
-updated: 2026-06-13
+updated: 2026-06-16
 tags: [chezmoi, mise, dotfiles, provisioning, how-to]
 audience: both
 ---
@@ -22,6 +22,7 @@ Where things live and how to add a new tool, dotfile, or provisioning step so it
 | `dot_zshrc` | The managed `~/.zshrc` — oh-my-zsh setup, mise activation, tool env wiring |
 | `dot_gitconfig.tmpl` | Git identity (`~/.gitconfig`) — name/email, rendered from install-time data (`.gitName`/`.gitEmail`) |
 | `dot_mvdotfiles.zsh` | Personal shell config (`~/.mvdotfiles.zsh`) sourced by `.zshrc`: tool inits, aliases, functions |
+| `dot_nanorc.tmpl` | The managed `~/.nanorc` — GNU nano syntax highlighting (includes the bundled syntax files, path templated per OS/arch) + editor niceties |
 | `.chezmoi.toml.tmpl` | Init prompts → chezmoi data: `profile`, plus `gitName`/`gitEmail` (answered at install, pre-fillable with `--promptString`) |
 
 `dot_` becomes a leading `.` in the target; a `.tmpl` suffix means chezmoi templates it.
@@ -81,6 +82,7 @@ Tool init (`eval "$(x init zsh)"`, PATH additions) goes in `dot_mvdotfiles.zsh`,
 - **oh-my-zsh install must keep our `.zshrc`** — the script passes `KEEP_ZSHRC=yes`. Don't drop it or the managed `.zshrc` gets overwritten with OMZ's template.
 - **Editing the managed `.zshrc` on a machine** shows as drift (it's managed now); change it in the repo and `myplace update`, or use the capture flow.
 - **Homebrew on macOS is opportunistic, never required.** `ensure_tool` uses brew when it's present and logs a note when it isn't, so a brew-less Mac still bootstraps; anything in mise's registry still belongs in mise, not here ([ADR-0008](../adrs/0008-opportunistic-homebrew-macos.md)).
+- **macOS `nano` is pico, not GNU nano.** `/usr/bin/nano` is a symlink to pico, which can't do syntax highlighting, so `command -v nano` is misleading and `ensure_tool nano nano` would no-op. The provision script installs real GNU nano via brew explicitly (idempotent on `brew list`); `~/.nanorc` (`dot_nanorc.tmpl`) wires up highlighting. On Linux `nano` is already GNU nano.
 - **Fonts and GUI apps are macOS-only.** They install as Homebrew casks via `ensure_cask`; the Linux fleet is headless servers, so casks are skipped there by design. A Linux desktop would need a different path (chezmoi externals) — not built yet ([ADR-0009](../adrs/0009-homebrew-casks-macos.md)).
 
 ## References

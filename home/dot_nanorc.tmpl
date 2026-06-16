@@ -1,0 +1,22 @@
+# ~/.nanorc — managed by myplace (chezmoi). Edit home/dot_nanorc.tmpl in the
+# repo, not here; local edits show as drift.
+#
+# Turns on GNU nano syntax highlighting by including the syntax definitions that
+# ship with the nano build, plus a few sensible defaults. NOTE: macOS
+# /usr/bin/nano is pico and ignores this file entirely — real GNU nano comes
+# from Homebrew (see .chezmoiscripts/run_onchange_provision.sh).
+
+# --- syntax highlighting: include the bundled syntax definitions ---
+{{- if eq .chezmoi.os "darwin" }}
+include "{{ if eq .chezmoi.arch "arm64" }}/opt/homebrew{{ else }}/usr/local{{ end }}/share/nano/*.nanorc"
+{{- else }}
+include "/usr/share/nano/*.nanorc"
+include "/usr/share/nano/extra/*.nanorc"
+{{- end }}
+
+# --- editor niceties ---
+set linenumbers      # show line numbers in the margin
+set constantshow     # always show the cursor's line/column
+set tabsize 4
+set autoindent       # keep the current indentation on a new line
+set softwrap         # wrap long lines on screen instead of scrolling sideways
