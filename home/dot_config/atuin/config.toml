@@ -19,6 +19,18 @@ workspaces = true
 # highlighted result.
 show_preview = true
 
+# Don't record these in the (synced, multi-machine) history — pure navigation
+# noise plus a leading-space opt-out. Regexes match the whole command. Secret
+# redaction is separate and on by default (secrets_filter).
+history_filter = [
+  "^ ",        # leading space = "don't record this one"
+  "^ls( |$)",
+  "^cd( |$)",
+  "^clear$",
+  "^pwd$",
+  "^exit$",
+]
+
 # Catppuccin Mocha (mauve accent) for the interactive search TUI. atuin has no
 # bundled Catppuccin (built-ins are default/autumn/marine), so the theme file is
 # vendored alongside this config at themes/<name>.toml. Matches bat/delta/fzf.
