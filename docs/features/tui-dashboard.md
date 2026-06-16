@@ -11,7 +11,7 @@ phase: 1
 
 ## Summary
 
-The bare `myplace` dashboard is a full-screen, **interactive** terminal UI: a header bar, a row of Dotfiles / Tools / Updates panes, a full-width Activity feed tailing the log, and a footer of key hints. Focus moves between panes; selecting an item opens a **detail panel** — the `chezmoi diff` of a drifted dotfile, or the version delta of a tool/package. On a wide terminal the detail panel sits to the right (master-detail); on a narrow one it replaces the body. `?` opens a help overlay, `u` shows per-step update progress, and `o` opens a sortable/filterable list of every outdated package. The whole thing is themed **Catppuccin** (Mocha dark / Latte light) and reflows on resize. It is **read-only** beyond the existing `u` converge ([ADR-0012](../adrs/0012-interactive-tui-navigation.md)).
+The bare `myplace` dashboard is a full-screen, **interactive** terminal UI: a header bar, a passive system-info band (OS + base specs), a row of Dotfiles / Tools / Updates panes, a full-width Activity feed tailing the log, and a footer of key hints. Focus moves between panes; selecting an item opens a **detail panel** — the `chezmoi diff` of a drifted dotfile, or the version delta of a tool/package. On a wide terminal the detail panel sits to the right (master-detail); on a narrow one it replaces the body. `?` opens a help overlay, `u` shows per-step update progress, and `o` opens a sortable/filterable list of every outdated package. The whole thing is themed **Catppuccin** (Mocha dark / Latte light) and reflows on resize. It is **read-only** beyond the existing `u` converge ([ADR-0012](../adrs/0012-interactive-tui-navigation.md)).
 
 ## Motivation
 
@@ -22,7 +22,7 @@ The first cut was a static display — three read-only panes that ignored most o
 ### In scope
 
 - A responsive full-screen layout (Lip Gloss panes sized from `tea.WindowSizeMsg`), themed with Catppuccin via a semantic theme abstraction ([ADR-0011](../adrs/0011-catppuccin-theming.md)).
-- Panes: header bar, Dotfiles, Tools, Updates available, Activity (log tail), footer.
+- Panes: header bar, system-info band, Dotfiles, Tools, Updates available, Activity (log tail), footer.
 - **Focus + selection**: move focus between panes; select an actionable item within the focused pane (drifted dotfiles, missing/outdated tools, outdated packages).
 - **Master-detail panel**: the selected item's detail — a drifted dotfile's `chezmoi diff` (a read, fetched lazily and cached), or a tool/package version delta (rendered from already-loaded data). Wide terminals show it beside the panes; narrow ones swap the body for it.
 - A **help overlay** (`?`) listing all keys.
@@ -84,6 +84,10 @@ The first cut was a static display — three read-only panes that ignored most o
 ### Live activity
 
 A 1-second `tea.Tick` reloads the tail of `myplace.log` into the Activity pane — commands the dashboard runs (and anything else writing the log) scroll by in near-real-time. The tick only re-reads the file tail; it never triggers a status recompute or network call.
+
+### System-info band
+
+A passive, three-line band sits between the header and the panes (fixed height, so the layout never shifts): **identity** (host model · OS · arch), **compute** (CPU · cores · GPU · RAM · root-disk used/total), and **power/net** (battery · local IPv4 · uptime). It loads asynchronously from fastfetch alongside the status report — `system: loading…` until it lands — and degrades to a single `system: fastfetch unavailable` line if fastfetch isn't installed. It has no keybinding and never affects the verdict badge. See [System information](system-information.md).
 
 ### Outdated detail (`o`)
 

@@ -16,6 +16,7 @@ import (
 	"github.com/mikevalstar/myplace/internal/mise"
 	"github.com/mikevalstar/myplace/internal/outdated"
 	"github.com/mikevalstar/myplace/internal/run"
+	"github.com/mikevalstar/myplace/internal/sysinfo"
 	"github.com/mikevalstar/myplace/internal/tui"
 	"github.com/mikevalstar/myplace/internal/version"
 )
@@ -103,7 +104,7 @@ func newRootCmd(r run.Runner, ch *chezmoi.Client, ms *mise.Client) *cobra.Comman
 				fmt.Print(renderStatusText(rep))
 				os.Exit(drift.ExitCode(rep.Verdict))
 			}
-			return tui.Run(ch, ms, sources, version.Version)
+			return tui.Run(ch, ms, sysinfo.New(r), sources, version.Version)
 		},
 	}
 
@@ -115,6 +116,7 @@ func newRootCmd(r run.Runner, ch *chezmoi.Client, ms *mise.Client) *cobra.Comman
 	root.AddCommand(
 		newStatusCmd(ch, ms),
 		newOutdatedCmd(sources...),
+		newSysinfoCmd(r),
 		newUpdateCmd(ch, ms),
 		newBootstrapCmd(ch, ms),
 		newVersionCmd(),

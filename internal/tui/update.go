@@ -35,6 +35,18 @@ func (m Model) loadInventoryCmd() tea.Cmd {
 	}
 }
 
+// loadSysinfoCmd gathers the fastfetch system snapshot for the header band,
+// independently of the drift report. fastfetch being absent is not fatal — the
+// band shows a notice (sysinfoMsg.err set) and the dashboard renders normally.
+func (m Model) loadSysinfoCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		info, err := m.si.Fetch(ctx)
+		return sysinfoMsg{info: info, err: err}
+	}
+}
+
 // diffCmd fetches `chezmoi diff <target>` for a selected dotfile. It is
 // read-only (a diff is a read) and the target is built exactly as the CLI
 // capture flow does (cmd/myplace/update.go) so the path resolves identically.
@@ -119,6 +131,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clampSelections()
 		m.sizeDetail()
 		return m, m.syncDetail()
+
+	case sysinfoMsg:
+		if msg.err != nil {
+			m.systemErr = true
+		} else {
+			m.system = msg.info
+		}
+		return m, nil
 
 	case inventoryMsg:
 		m.inventory = &msg.inv

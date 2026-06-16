@@ -19,7 +19,7 @@ func ptr[T any](v T) *T { return &v }
 // sampleModel builds a populated, non-loading dashboard for render checks. The
 // detail viewport is sized and synced so the master-detail panel has content.
 func sampleModel(w, h int) Model {
-	m := New(nil, nil, nil, "0.1.0")
+	m := New(nil, nil, nil, nil, "0.1.0")
 	m.loading = false
 	m.invLoading = false
 	m.width, m.height = w, h

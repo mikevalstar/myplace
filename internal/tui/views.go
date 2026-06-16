@@ -585,7 +585,7 @@ func (m Model) helpView() string {
 // panel on the right ~40%.
 func (m Model) wideView() string {
 	w, h := m.width, m.height
-	bodyH := h - 3
+	bodyH := h - 3 - sysinfoBandLines
 	leftW := w * 60 / 100
 	rightW := w - leftW
 
@@ -604,14 +604,14 @@ func (m Model) wideView() string {
 	left := lipgloss.JoinVertical(lipgloss.Left, top, m.renderActivity(leftW, botH))
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, m.renderDetailPanel(rightW, bodyH))
 
-	return strings.Join([]string{m.header(w), body, m.footer(w)}, "\n")
+	return strings.Join([]string{m.header(w), m.sysinfoBand(w), body, m.footer(w)}, "\n")
 }
 
 // narrowView keeps the three panes across the top with Activity below and no
 // side panel; `enter` opens the detail full-screen instead.
 func (m Model) narrowView() string {
 	w, h := m.width, m.height
-	bodyH := h - 3
+	bodyH := h - 3 - sysinfoBandLines
 	topH := bodyH * 55 / 100
 	if topH < 5 {
 		topH = 5
@@ -624,7 +624,7 @@ func (m Model) narrowView() string {
 		m.pane(focusTools, "Tools (mise)", colW, topH),
 		m.pane(focusUpdates, "Updates available", w-2*colW, topH),
 	)
-	return strings.Join([]string{m.header(w), top, m.renderActivity(w, botH), m.footer(w)}, "\n")
+	return strings.Join([]string{m.header(w), m.sysinfoBand(w), top, m.renderActivity(w, botH), m.footer(w)}, "\n")
 }
 
 // pane renders one focusable dashboard card with its accent header + count chip.
@@ -643,7 +643,13 @@ func (m Model) smallView() string {
 	var b strings.Builder
 	head := th.Header.Render("myplace "+m.version) + " " + m.badge(r.Verdict) +
 		th.Subtle.Render(fmt.Sprintf(" %s (%s)", r.Machine, r.Profile))
-	b.WriteString(truncate(head, m.width) + "\n\n")
+	b.WriteString(truncate(head, m.width) + "\n")
+	if m.system != nil {
+		if lines := sysinfoBandLinesFor(m.system); len(lines) > 0 {
+			b.WriteString(th.Subtle.Render(truncate(lines[0], m.width)) + "\n")
+		}
+	}
+	b.WriteString("\n")
 	b.WriteString(th.PaneTitle.Render("Dotfiles") + "\n")
 	drows, _ := m.dotfilesContent()
 	for _, rw := range drows {

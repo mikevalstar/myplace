@@ -26,6 +26,7 @@ import (
 	"github.com/mikevalstar/myplace/internal/drift"
 	"github.com/mikevalstar/myplace/internal/mise"
 	"github.com/mikevalstar/myplace/internal/outdated"
+	"github.com/mikevalstar/myplace/internal/sysinfo"
 )
 
 // Minimum terminal size below which we render a plain stacked fallback rather
@@ -77,6 +78,10 @@ const (
 
 type reportMsg struct{ report drift.Report }
 type inventoryMsg struct{ inv outdated.Inventory }
+type sysinfoMsg struct {
+	info *sysinfo.Info
+	err  error
+}
 type activityTickMsg struct{}
 type diffMsg struct {
 	path string
@@ -113,6 +118,7 @@ type paneRow struct {
 type Model struct {
 	ch      *chezmoi.Client
 	ms      *mise.Client
+	si      *sysinfo.Client
 	sources []outdated.Source
 	version string
 
@@ -123,6 +129,8 @@ type Model struct {
 	spinner    spinner.Model
 	report     *drift.Report
 	inventory  *outdated.Inventory
+	system     *sysinfo.Info
+	systemErr  bool
 	loading    bool
 	invLoading bool
 	width      int
@@ -157,13 +165,13 @@ type Model struct {
 	activity []string
 }
 
-func New(ch *chezmoi.Client, ms *mise.Client, sources []outdated.Source, version string) Model {
+func New(ch *chezmoi.Client, ms *mise.Client, si *sysinfo.Client, sources []outdated.Source, version string) Model {
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
 	fi := textinput.New()
 	fi.Prompt = "filter: "
 	fi.CharLimit = 64
 	return Model{
-		ch: ch, ms: ms, sources: sources, version: version,
+		ch: ch, ms: ms, si: si, sources: sources, version: version,
 		theme:       DefaultTheme(),
 		keys:        newKeyMap(),
 		help:        help.New(),
@@ -178,11 +186,11 @@ func New(ch *chezmoi.Client, ms *mise.Client, sources []outdated.Source, version
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spinner.Tick, m.loadCmd(), m.loadInventoryCmd(), activityTick())
+	return tea.Batch(m.spinner.Tick, m.loadCmd(), m.loadInventoryCmd(), m.loadSysinfoCmd(), activityTick())
 }
 
 // Run starts the dashboard.
-func Run(ch *chezmoi.Client, ms *mise.Client, sources []outdated.Source, version string) error {
-	_, err := tea.NewProgram(New(ch, ms, sources, version), tea.WithAltScreen()).Run()
+func Run(ch *chezmoi.Client, ms *mise.Client, si *sysinfo.Client, sources []outdated.Source, version string) error {
+	_, err := tea.NewProgram(New(ch, ms, si, sources, version), tea.WithAltScreen()).Run()
 	return err
 }
