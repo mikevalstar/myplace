@@ -2,7 +2,8 @@ package drift
 
 import "testing"
 
-func intp(n int) *int { return &n }
+func intp(n int) *int    { return &n }
+func boolp(b bool) *bool { return &b }
 
 func TestDecide(t *testing.T) {
 	clean := Dotfiles{BehindOrigin: intp(0), UncommittedFiles: intp(0), UnpushedCommits: intp(0)}
@@ -25,6 +26,8 @@ func TestDecide(t *testing.T) {
 		{"behind origin", Dotfiles{BehindOrigin: intp(2), UncommittedFiles: intp(0), UnpushedCommits: intp(0)}, noTools, Myplace{}, false, false, VerdictDrifted, 1},
 		{"local modification", Dotfiles{LocalModified: []string{".zshrc"}, BehindOrigin: intp(0)}, noTools, Myplace{}, false, false, VerdictDrifted, 1},
 		{"unpushed commits", Dotfiles{BehindOrigin: intp(0), UnpushedCommits: intp(1)}, noTools, Myplace{}, false, false, VerdictDrifted, 1},
+		{"unpushed commits parked by policy", Dotfiles{BehindOrigin: intp(0), UnpushedCommits: intp(1), PushAllowed: boolp(false)}, noTools, Myplace{}, false, false, VerdictInSync, 0},
+		{"uncommitted files still drift when push disabled", Dotfiles{BehindOrigin: intp(0), UncommittedFiles: intp(1), UnpushedCommits: intp(1), PushAllowed: boolp(false)}, noTools, Myplace{}, false, false, VerdictDrifted, 1},
 		{"missing tool", clean, Tools{Missing: []string{"node"}}, Myplace{}, false, false, VerdictDrifted, 1},
 		{"outdated tool", clean, Tools{Outdated: []ToolIssue{{Name: "node"}}}, Myplace{}, false, false, VerdictDrifted, 1},
 		{"offline but otherwise clean", Dotfiles{}, noTools, Myplace{}, true, false, VerdictUnknown, 2},

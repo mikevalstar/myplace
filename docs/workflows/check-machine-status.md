@@ -53,7 +53,8 @@ All checks are read-only on the machine (the only network op is a git fetch into
     "to_apply": ["dot_zshrc"],
     "local_modified": [],
     "uncommitted_files": 0,
-    "unpushed_commits": 0
+    "unpushed_commits": 0,
+    "push_allowed": false
   },
   "tools": {
     "missing": [],
@@ -63,7 +64,7 @@ All checks are read-only on the machine (the only network op is a git fetch into
 }
 ```
 
-The integer count fields under `dotfiles` and `myplace.latest` are `null` (not `0`) when the underlying check couldn't run — offline, or no upstream configured. Any non-`null` value in `uncommitted_files` or `unpushed_commits` is outgoing drift and pushes the verdict to `drifted`. A degraded run also carries a top-level `"errors": []` string array (omitted when empty) and reports `verdict: "unknown"`. The envelope (`schema`, stream discipline, exit codes) is owned by the [headless CLI spec](../features/headless-cli-and-json-output.md).
+The integer count fields under `dotfiles` and `myplace.latest` are `null` (not `0`) when the underlying check couldn't run — offline, or no upstream configured. Any non-`null` value in `uncommitted_files` is outgoing drift and pushes the verdict to `drifted`. `unpushed_commits` is drift only when `push_allowed` is true; on no-push profiles such as `server`, local commits are reported but treated as parked by policy. A degraded run also carries a top-level `"errors": []` string array (omitted when empty) and reports `verdict: "unknown"`. The envelope (`schema`, stream discipline, exit codes) is owned by the [headless CLI spec](../features/headless-cli-and-json-output.md).
 
 ## Outcome
 

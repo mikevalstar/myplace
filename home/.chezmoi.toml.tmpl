@@ -11,8 +11,10 @@
     profile = {{ $profile | quote }}
     gitName = {{ $gitName | quote }}
     gitEmail = {{ $gitEmail | quote }}
+    push = {{ ne $profile "server" }}
     # Machines share by default; per-machine differences (e.g. a work email)
     # are answered at install time, not branched in templates.
+    # Work machines can push shared config; servers consume by default.
 
 [git]
     autoCommit = false

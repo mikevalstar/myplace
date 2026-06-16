@@ -312,13 +312,22 @@ func captureOutgoing(ctx context.Context, ch *chezmoi.Client) error {
 		}
 	}
 
+	policy, err := ch.PushPolicy(ctx)
+	if err != nil {
+		policy = chezmoi.PushPolicy{Allowed: true, Source: "default"}
+	}
+
 	n, err := ch.Uncommitted(ctx)
 	if err != nil || n == 0 {
 		return nil
 	}
 	var share bool
+	title := fmt.Sprintf("Source repo has %d uncommitted change(s) — commit and push?", n)
+	if !policy.Allowed {
+		title = fmt.Sprintf("Source repo has %d uncommitted change(s) — commit locally?", n)
+	}
 	if err := huh.NewConfirm().
-		Title(fmt.Sprintf("Source repo has %d uncommitted change(s) — commit and push?", n)).
+		Title(title).
 		Value(&share).Run(); err != nil {
 		return err
 	}
@@ -332,6 +341,10 @@ func captureOutgoing(ctx context.Context, ch *chezmoi.Client) error {
 	}
 	if err := ch.CommitAll(ctx, msg); err != nil {
 		return fmt.Errorf("commit: %w", err)
+	}
+	if !policy.Allowed {
+		fmt.Fprintln(os.Stderr, "push skipped by profile policy; commit kept locally")
+		return nil
 	}
 	if err := ch.Push(ctx); err != nil {
 		// Not fatal: the commit is safe locally; status shows it as unpushed.

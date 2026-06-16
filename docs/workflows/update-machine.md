@@ -46,7 +46,7 @@ The update screen presents drift grouped into the four buckets below; the user c
 Decision points worth noting:
 
 - **Conflicts on pull** (rebase fails): myplace does not attempt automatic conflict resolution — the step reports the git error and exits 1, leaving the source dir for the user to resolve by hand. (🚧 The planned `tea.ExecProcess` hand-off to a shell in the source dir is **not yet built**.)
-- **Work-mac caution (🚧 not yet built — planned):** profile data is intended to mark a machine `push: false` (e.g. work Mac policy) — outgoing capture would then stop at local commit and the dashboard would show "unpushed by policy" instead of treating it as drift to fix. No profile-policy check exists yet.
+- **Server push policy:** profile data marks machines that should not originate shared config changes as `push: false`. Current policy: `personal-mac` and `work-mac` may push; `server` does not push by default. On a no-push profile, outgoing capture stops at a local commit and the dashboard shows "unpushed by policy" instead of treating it as drift to fix.
 
 ### Output (`--json`)
 

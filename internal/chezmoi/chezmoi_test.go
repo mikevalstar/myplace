@@ -6,11 +6,14 @@ import (
 	"testing"
 )
 
-type fakeRunner struct{ args []string }
+type fakeRunner struct {
+	args []string
+	out  []byte
+}
 
 func (f *fakeRunner) Run(_ context.Context, _ string, name string, args ...string) ([]byte, error) {
 	f.args = append([]string{name}, args...)
-	return nil, nil
+	return f.out, nil
 }
 
 // Locks the init contract that bit us: --no-tty is always present, and the
@@ -94,5 +97,32 @@ func TestParseStatus(t *testing.T) {
 func TestParseStatusEmpty(t *testing.T) {
 	if files := ParseStatus([]byte("")); len(files) != 0 {
 		t.Errorf("want no files from empty output, got %v", files)
+	}
+}
+
+func TestPushPolicy(t *testing.T) {
+	tests := []struct {
+		name   string
+		data   string
+		want   bool
+		source string
+	}{
+		{name: "explicit true", data: `{"profile":"server","push":true}`, want: true, source: "data.push"},
+		{name: "explicit false", data: `{"profile":"work-mac","push":false}`, want: false, source: "data.push"},
+		{name: "server default false", data: `{"profile":"server"}`, want: false, source: "profile:server"},
+		{name: "work mac default true", data: `{"profile":"work-mac"}`, want: true, source: "default"},
+		{name: "personal mac default true", data: `{"profile":"personal-mac"}`, want: true, source: "default"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := New(&fakeRunner{out: []byte(tt.data)})
+			got, err := c.PushPolicy(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Allowed != tt.want || got.Source != tt.source {
+				t.Errorf("policy: want allowed=%v source=%q, got %+v", tt.want, tt.source, got)
+			}
+		})
 	}
 }

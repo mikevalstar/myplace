@@ -43,6 +43,7 @@ type Dotfiles struct {
 	LocalModified    []string `json:"local_modified"`
 	UncommittedFiles *int     `json:"uncommitted_files"`
 	UnpushedCommits  *int     `json:"unpushed_commits"`
+	PushAllowed      *bool    `json:"push_allowed,omitempty"`
 }
 
 type ToolIssue struct {
@@ -82,10 +83,14 @@ func Decide(d Dotfiles, t Tools, m Myplace, hadUnknown, hadFatal bool) string {
 	if hadFatal {
 		return VerdictError
 	}
+	pushAllowed := true
+	if d.PushAllowed != nil {
+		pushAllowed = *d.PushAllowed
+	}
 	drifted := len(d.ToApply) > 0 || len(d.LocalModified) > 0 ||
 		(d.BehindOrigin != nil && *d.BehindOrigin > 0) ||
 		(d.UncommittedFiles != nil && *d.UncommittedFiles > 0) ||
-		(d.UnpushedCommits != nil && *d.UnpushedCommits > 0) ||
+		(pushAllowed && d.UnpushedCommits != nil && *d.UnpushedCommits > 0) ||
 		len(t.Missing) > 0 || len(t.Outdated) > 0 ||
 		(m.Latest != nil && *m.Latest != m.Current)
 	if drifted {
@@ -126,8 +131,10 @@ func Compute(ctx context.Context, ch *chezmoi.Client, ms *mise.Client, myplaceVe
 		r.Errors = append(r.Errors, "chezmoi is not initialized on this machine — run `myplace bootstrap`")
 		hadFatal = true
 	default:
-		if p, err := ch.Profile(ctx); err == nil {
-			r.Profile = p
+		if data, err := ch.Data(ctx); err == nil {
+			r.Profile = data.Profile
+			policy := chezmoi.PushPolicyForData(data)
+			r.Dotfiles.PushAllowed = &policy.Allowed
 		}
 		if files, err := ch.Status(ctx); err != nil {
 			fail("chezmoi status: " + err.Error())

@@ -12,7 +12,7 @@ Target machines: personal Macs, a work Mac, and assorted Linux servers — one c
 
 This repo is a monorepo: the Go app, the chezmoi dotfiles (under [home/](home/), via `.chezmoiroot`), and the machines' mise config all live here — one clone carries everything ([ADR-0003](docs/adrs/0003-monorepo-app-dotfiles-mise.md)).
 
-> 🚧 **v0.** Bootstrap, status (TUI + `--json`), update with interactive capture of local edits, outdated-package inventory (mise + brew, TUI + `--json`), system info (`sysinfo`, TUI band + `--json`), preflight diagnostics (`doctor`, + `--json`), `self-update`, and self-describing help (`help --llm`/`--json`) all work. Not yet built: per-file diff review before apply, `push: false` profile policy, and the phase-2 server.
+> 🚧 **v0.** Bootstrap, status (TUI + `--json`), update with interactive capture of local edits and per-file incoming diff review, profile push policy, outdated-package inventory (mise + brew, TUI + `--json`), system info (`sysinfo`, TUI band + `--json`), preflight diagnostics (`doctor`, + `--json`), `self-update`, and self-describing help (`help --llm`/`--json`) all work. Not yet built: the phase-2 server.
 
 ## Install
 

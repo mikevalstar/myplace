@@ -23,6 +23,26 @@ type Client struct {
 
 func New(r run.Runner) *Client { return &Client{r: r} }
 
+type MachineData struct {
+	Profile string `json:"profile"`
+	Push    *bool  `json:"push,omitempty"`
+}
+
+type PushPolicy struct {
+	Allowed bool
+	Source  string
+}
+
+func PushPolicyForData(data MachineData) PushPolicy {
+	if data.Push != nil {
+		return PushPolicy{Allowed: *data.Push, Source: "data.push"}
+	}
+	if data.Profile == "server" {
+		return PushPolicy{Allowed: false, Source: "profile:server"}
+	}
+	return PushPolicy{Allowed: true, Source: "default"}
+}
+
 // cz runs chezmoi with --no-tty always set, so a conflict prompt can never
 // open /dev/tty and hang a caller (notably the TUI, which owns the terminal).
 // With no TTY and a closed stdin, chezmoi fails fast instead of blocking.
@@ -80,21 +100,38 @@ func (c *Client) LsRemote(ctx context.Context) error {
 	return err
 }
 
-// Profile returns the machine profile from chezmoi's template data
+// Data returns the myplace machine data from chezmoi's template data
 // (set by home/.chezmoi.toml.tmpl on init).
-func (c *Client) Profile(ctx context.Context) (string, error) {
+func (c *Client) Data(ctx context.Context) (MachineData, error) {
 	out, err := c.cz(ctx, "data", "--format", "json")
+	if err != nil {
+		return MachineData{}, err
+	}
+	var data MachineData
+	if err := json.Unmarshal(out, &data); err != nil {
+		return MachineData{}, err
+	}
+	return data, nil
+}
+
+// Profile returns the machine profile from chezmoi's template data.
+func (c *Client) Profile(ctx context.Context) (string, error) {
+	data, err := c.Data(ctx)
 	if err != nil {
 		return "", err
 	}
-	var data map[string]any
-	if err := json.Unmarshal(out, &data); err != nil {
-		return "", err
+	return data.Profile, nil
+}
+
+// PushPolicy reports whether this profile is allowed to push captured source
+// repo commits. An explicit data.push wins; older bootstraps without it use
+// the current profile default: servers consume, Macs may originate changes.
+func (c *Client) PushPolicy(ctx context.Context) (PushPolicy, error) {
+	data, err := c.Data(ctx)
+	if err != nil {
+		return PushPolicy{}, err
 	}
-	if p, ok := data["profile"].(string); ok {
-		return p, nil
-	}
-	return "", nil
+	return PushPolicyForData(data), nil
 }
 
 // FileStatus is one line of `chezmoi status`.

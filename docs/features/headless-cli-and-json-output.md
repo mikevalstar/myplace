@@ -83,7 +83,7 @@ $ myplace status --json
   "profile": "server",
   "checked_at": "2026-06-12T20:00:00Z",
   "verdict": "drifted",
-  "dotfiles": { "behind_origin": 2, "to_apply": ["dot_zshrc"], "local_modified": [], "uncommitted_files": 0, "unpushed_commits": 0 },
+  "dotfiles": { "behind_origin": 2, "to_apply": ["dot_zshrc"], "local_modified": [], "uncommitted_files": 0, "unpushed_commits": 0, "push_allowed": true },
   "tools": { "missing": [], "outdated": [{ "name": "node", "current": "22.1.0", "wanted": "22.3.0" }] },
   "myplace": { "current": "0.3.0", "latest": "0.4.0" }
 }
@@ -91,7 +91,7 @@ $ echo $?
 1
 ```
 
-The integer count fields under `dotfiles` (`behind_origin`, `uncommitted_files`, `unpushed_commits`) are **nullable**: they are `null` when the check couldn't run (offline, or no upstream configured), not `0`. `myplace.latest` is `null` when the release check was skipped (offline). On a degraded run a top-level `"errors": [...]` array of strings appears alongside the report (omitted when empty) and the verdict is `unknown`.
+The integer count fields under `dotfiles` (`behind_origin`, `uncommitted_files`, `unpushed_commits`) are **nullable**: they are `null` when the check couldn't run (offline, or no upstream configured), not `0`. `dotfiles.push_allowed` is present when the profile policy can be resolved; no-push profiles still report `unpushed_commits`, but those commits do not make the verdict `drifted`. `myplace.latest` is `null` when the release check was skipped (offline). On a degraded run a top-level `"errors": [...]` array of strings appears alongside the report (omitted when empty) and the verdict is `unknown`.
 
 Full field semantics live in the [status workflow](../workflows/check-machine-status.md); this document owns the envelope (`schema`, stream discipline, exit codes), the workflow owns the drift semantics.
 

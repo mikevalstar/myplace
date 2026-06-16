@@ -85,6 +85,9 @@ func (m Model) dotfilesContent() ([]paneRow, []selectable) {
 	}
 	plain("uncommitted:      " + count(d.UncommittedFiles))
 	plain("unpushed commits: " + count(d.UnpushedCommits))
+	if d.PushAllowed != nil && !*d.PushAllowed {
+		plain("push policy:      disabled")
+	}
 	return rows, items
 }
 

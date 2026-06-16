@@ -74,6 +74,9 @@ func renderStatusText(r drift.Report) string {
 	fmt.Fprintf(&b, "  dotfiles: %s behind origin, %d to apply, %d modified locally, %s uncommitted, %s unpushed\n",
 		n(r.Dotfiles.BehindOrigin), len(r.Dotfiles.ToApply), len(r.Dotfiles.LocalModified),
 		n(r.Dotfiles.UncommittedFiles), n(r.Dotfiles.UnpushedCommits))
+	if r.Dotfiles.PushAllowed != nil && !*r.Dotfiles.PushAllowed {
+		fmt.Fprintf(&b, "    push policy: disabled for this profile; unpushed commits are parked locally\n")
+	}
 	for _, f := range r.Dotfiles.ToApply {
 		fmt.Fprintf(&b, "    ↓ %s\n", f)
 	}
