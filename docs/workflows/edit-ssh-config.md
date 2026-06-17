@@ -47,13 +47,14 @@ block in it (the template adds that).
 
 ```sh
 # 1. pull the current host list to a temp file
-op document get "ssh config" --vault Private > "$HOME/.sshconfig.edit"
+#    (--account disambiguates if more than one account is signed in; drop it otherwise)
+op document get "ssh config" --vault Private --account my.1password.com > "$HOME/.sshconfig.edit"
 
 # 2. edit it — add/adjust Host blocks only (not the global Host * block)
 "${EDITOR:-nano}" "$HOME/.sshconfig.edit"
 
 # 3. push the new contents back into 1Password
-op document edit "ssh config" "$HOME/.sshconfig.edit" --vault Private
+op document edit "ssh config" "$HOME/.sshconfig.edit" --vault Private --account my.1password.com
 
 # 4. remove the local copy (it contains your IPs)
 rm -f "$HOME/.sshconfig.edit"

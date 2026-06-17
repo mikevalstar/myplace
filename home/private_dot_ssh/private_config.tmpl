@@ -8,10 +8,14 @@
   vault) and edit it there — do not paste hosts into this repo. To change the
   shared defaults every machine gets, edit the `Host *` block in this file.
 
-  onepasswordDocument args: "<item title or uuid>" "<vault>". Adjust if you store
-  it elsewhere. Requires an authenticated `op` (1Password CLI) on macs. */ -}}
+  onepasswordDocument args: "<item title or uuid>" "<vault>" "<account>". The
+  account (a 1Password sign-in address) is required so `op` can disambiguate when
+  a machine is signed into more than one account — the Document lives in the
+  personal account, which every non-server mac must be signed into to read it.
+  Adjust if you store it elsewhere. Requires an authenticated `op` (1Password
+  CLI) on macs. */ -}}
 {{- if ne .profile "server" }}
-{{ onepasswordDocument "ssh config" "Private" -}}
+{{ onepasswordDocument "ssh config" "Private" "my.1password.com" -}}
 {{ end }}
 # --- global defaults (managed by myplace; every machine) ---
 Host *

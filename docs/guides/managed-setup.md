@@ -110,9 +110,14 @@ The worked example is `~/.ssh/config` (`private_dot_ssh/private_config.tmpl`):
    field instead.
 2. **Reference it from the template**, not the repo:
    ```gotmpl
-   {{ onepasswordDocument "ssh config" "Private" }}     # whole file
-   {{ onepasswordRead "op://Private/some-item/token" }} # one field
+   {{ onepasswordDocument "ssh config" "Private" "my.1password.com" }} # whole file
+   {{ onepasswordRead "op://Private/some-item/token" }}               # one field
    ```
+   The third arg is the 1Password account (a sign-in address). It's **required**
+   so `op` can disambiguate on a machine signed into more than one account —
+   without it, chezmoi's apply fails with `multiple accounts found`. The Document
+   lives in the personal account, which every non-server mac must be signed into
+   to read it, so naming it explicitly is both correct and portable.
 3. **Gate by profile so servers don't need the secret.** Wrap the pull in
    `{{ if ne .profile "server" }}…{{ end }}`. Go templates only evaluate the taken
    branch, so servers never call `op` — they render only the non-secret parts.
@@ -123,9 +128,11 @@ The worked example is `~/.ssh/config` (`private_dot_ssh/private_config.tmpl`):
 5. **To change the host list later, edit the 1Password Document** — not this repo.
    Do it with the `op` CLI so a server IP never lands in a tracked file:
    ```sh
-   op document get "ssh config" --vault Private              # read current
-   printf '%s' "$NEW_CONFIG" | op document edit "ssh config" - --vault Private  # replace
+   op document get "ssh config" --vault Private --account my.1password.com  # read current
+   printf '%s' "$NEW_CONFIG" | op document edit "ssh config" - --vault Private --account my.1password.com  # replace
    ```
+   `--account` is needed when more than one account is signed in (same reason the
+   template passes it); drop it if the machine has only the one account.
    To change the shared defaults every machine gets (not secret), edit the
    `Host *` block in the template and `myplace update`.
 
