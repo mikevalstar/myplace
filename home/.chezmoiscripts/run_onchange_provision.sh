@@ -138,6 +138,10 @@ fi
 # --- non-registry CLI tools (not in mise's registry; brew-if-present on macOS, ADR-0008) ---
 ensure_tool http httpie
 ensure_tool mosh mosh
+# neovim: the default $EDITOR (dot_mvdotfiles.zsh), configured with LazyVim via
+# ~/.config/nvim (dot_config/nvim/**). Not managed by mise — brew on macOS, the
+# system package manager on Linux. Package is `neovim`, command is `nvim`.
+ensure_tool nvim neovim
 
 # nano: macOS ships `/usr/bin/nano` as a symlink to pico, which has no syntax
 # highlighting — so `command -v nano` is misleading and ensure_tool would skip
