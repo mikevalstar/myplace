@@ -1,0 +1,8 @@
+# chezmoi ignore list — target paths (relative to $HOME) chezmoi won't manage.
+# Ignored files already on disk are left alone, not removed.
+
+# LazyVim's plugin lockfile is machine-local: lazy.nvim installs the latest
+# plugin commits on a fresh machine and rewrites this file rather than restoring
+# our pinned versions, so committing it just makes every machine that opens nvim
+# show as drifted. Let each machine own its own lock.
+.config/nvim/lazy-lock.json
