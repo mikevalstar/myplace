@@ -14,8 +14,29 @@ include "/usr/share/nano/*.nanorc"
 include "/usr/share/nano/extra/*.nanorc"
 {{- end }}
 
+# --- Catppuccin Mocha (mauve accent) for nano's interface chrome ---
+# Matches ghostty/bat/starship/zed/atuin. nano 5.0+ accepts hex colors; these
+# theme the UI only (title/status/gutter/keys/selection). Syntax-highlight
+# colors come from the bundled *.nanorc included above and use named colors,
+# which the terminal already renders in Mocha — so they're not re-defined here.
+# Palette: base #1e1e2e surface0 #313244 surface1 #45475a overlay0 #6c7086
+#          text #cdd6f4 subtext0 #a6adc8 mauve #cba6f7 red #f38ba8 yellow #f9e2af
+set titlecolor    bold #cba6f7,#313244   # title bar: mauve on surface0
+set statuscolor   #1e1e2e,#cba6f7        # status feedback bar: base on mauve
+set errorcolor    #1e1e2e,#f38ba8        # error bar: base on red
+set numbercolor   #6c7086                # line-number gutter (when M-N toggles it on)
+set keycolor      #cba6f7                # ^X-style key combos: mauve
+set functioncolor #a6adc8                # their descriptions: subtext0
+set promptcolor   #cdd6f4,#313244        # answer prompts: text on surface0
+set selectedcolor #cdd6f4,#45475a        # marked/selected text: text on surface1
+set spotlightcolor #1e1e2e,#f9e2af       # search-match highlight: base on yellow
+set scrollercolor #cba6f7                # scrollbar thumb: mauve
+set minicolor     #cdd6f4,#313244        # minibar (when title bar hidden)
+
 # --- editor niceties ---
-set linenumbers      # show line numbers in the margin
+# linenumbers off by default: the margin gutter is part of the terminal's
+# selectable region, so a mouse drag grabs the numbers along with the text.
+# Toggle them on live with M-N (Esc N / Alt+N) when you actually want them.
 set constantshow     # always show the cursor's line/column
 set tabsize 4
 set autoindent       # keep the current indentation on a new line
