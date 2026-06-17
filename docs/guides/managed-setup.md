@@ -19,7 +19,7 @@ Where things live and how to add a new tool, dotfile, or provisioning step so it
 |------|------------|
 | `dot_config/mise/config.toml.tmpl` | The mise tool set — every machine's CLI tools/runtimes from mise's registry |
 | `dot_mvscripts/executable_*` | Helper scripts deployed to a dedicated `~/.mvscripts` (on `PATH`), runnable by name on every machine; `mv_scripts` lists them ([ADR-0014](../adrs/0014-managed-scripts-and-bun-runner.md)) |
-| `.chezmoiscripts/run_onchange_provision.sh` | Idempotent installer for the things mise can't own — git, zsh, oh-my-zsh + plugins, rustup, fnm, plain OS/brew packages via `ensure_tool` (httpie, mosh, neovim, nano), and macOS-only fonts/GUI casks via `ensure_cask` |
+| `.chezmoiscripts/run_onchange_provision.sh` | Idempotent installer for the things mise can't own — git, zsh, oh-my-zsh + plugins, rustup, fnm (+ unzip), tokei (cargo build), a current neovim (official static build → `/usr/local` on Linux, brew on macOS), plain OS/brew packages via `ensure_tool` (httpie, mosh, nano), and macOS-only fonts/GUI casks via `ensure_cask` |
 | `dot_zshrc` | The managed `~/.zshrc` — oh-my-zsh setup, mise activation, tool env wiring |
 | `dot_gitconfig.tmpl` | `~/.gitconfig` — identity (name/email from `.gitName`/`.gitEmail`), modern defaults, and SSH commit signing auto-enabled when a key exists ([ADR-0015](../adrs/0015-git-defaults-and-ssh-commit-signing.md)) |
 | `dot_config/git/allowed_signers.tmpl` | `~/.config/git/allowed_signers` — generated `<email> <pubkey>` so local signature verification works; empty (and signing off) on a keyless machine |
