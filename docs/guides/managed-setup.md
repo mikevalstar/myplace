@@ -121,8 +121,13 @@ The worked example is `~/.ssh/config` (`private_dot_ssh/private_config.tmpl`):
    is Apple-openssh-only; Linux `ssh` errors on it). Both mac profiles are
    `darwin`, so OS is the correct axis for OS quirks.
 5. **To change the host list later, edit the 1Password Document** — not this repo.
-   To change the shared defaults every machine gets, edit the `Host *` block in
-   the template and `myplace update`.
+   Do it with the `op` CLI so a server IP never lands in a tracked file:
+   ```sh
+   op document get "ssh config" --vault Private              # read current
+   printf '%s' "$NEW_CONFIG" | op document edit "ssh config" - --vault Private  # replace
+   ```
+   To change the shared defaults every machine gets (not secret), edit the
+   `Host *` block in the template and `myplace update`.
 
 ### Shell tool wiring
 

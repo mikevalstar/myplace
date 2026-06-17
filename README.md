@@ -79,6 +79,7 @@ After install + a bootstrap, this is what lands where. Paths honor the XDG base 
 | `~/.local/share/chezmoi/` | chezmoi's **source clone** of this repo — the copy `myplace update` does `git pull` + apply on. The dotfiles live under its `home/` subdir (selected by [`.chezmoiroot`](home/)). Edit + push the repo, not the applied files. |
 | `~/.zshrc`, `~/.mvdotfiles.zsh`, `~/.gitconfig` | Dotfiles applied into `$HOME` from the source state. Editing these directly shows up as drift. |
 | `~/.config/mise/config.toml` | This machine's global mise tool set, rendered from `home/dot_config/mise/config.toml.tmpl`. |
+| `~/.ssh/config` | Rendered (macs only): host list pulled from a 1Password Document, plus non-secret global defaults from the template. Server IPs stay out of this public repo ([ADR-0016](docs/adrs/0016-secrets-in-dotfiles-via-1password.md)). Edit hosts in 1Password, not here — see below. |
 | `~/.local/state/myplace/myplace.log` | Debug log (see below). Honors `XDG_STATE_HOME`; override with `MYPLACE_STATE_DIR`. Deliberately outside `~/.config` so it never lands in your dotfiles. |
 | `~/.oh-my-zsh`, `~/.cargo` + `~/.rustup`, `~/.local/share/fnm` | Installed by the provision script — oh-my-zsh, rustup (Rust), and fnm (Node): the things mise can't own ([ADR-0007](docs/adrs/0007-provisioning-mechanism.md)). |
 | `~/.local/share/mise/` | mise's own installed tools, shims, and runtimes. |
@@ -86,6 +87,7 @@ After install + a bootstrap, this is what lands where. Paths honor the XDG base 
 `chezmoi` and `mise` themselves are installed by `bootstrap` if missing; their location varies by platform (Homebrew on a Mac, `~/.local/bin` on a bare server). Treat `~/.config` as chezmoi's tree — machine-local state goes in the state dir above, never there ([ADR-0005](docs/adrs/0005-machine-local-state-directory.md)).
 
 Adding a tool or dotfile to the managed set: [managed-setup guide](docs/guides/managed-setup.md).
+Editing your SSH hosts (kept in 1Password, not the repo): [edit-ssh-config workflow](docs/workflows/edit-ssh-config.md).
 
 ## Logs
 
