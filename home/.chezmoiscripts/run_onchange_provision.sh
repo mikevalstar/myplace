@@ -138,6 +138,11 @@ fi
 # --- non-registry CLI tools (not in mise's registry; brew-if-present on macOS, ADR-0008) ---
 ensure_tool http httpie
 ensure_tool mosh mosh
+# micro: modern terminal editor, offered alongside nano (EDITOR stays nvim). Not
+# in mise's registry; pkg name is `micro` on brew and the Linux package managers.
+# Themed via ~/.config/micro (dot_config/micro/*); needs MICRO_TRUECOLOR=1 (set in
+# dot_mvdotfiles.zsh) for the Catppuccin Mocha truecolor scheme to render exactly.
+ensure_tool micro micro
 
 # nano: macOS ships `/usr/bin/nano` as a symlink to pico, which has no syntax
 # highlighting — so `command -v nano` is misleading and ensure_tool would skip

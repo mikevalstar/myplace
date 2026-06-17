@@ -130,6 +130,10 @@ fi
 
 ## Some ENV things
 export EDITOR="nvim"
+# micro's truecolor detection via tcell is unreliable, so it needs this set
+# explicitly for the Catppuccin Mocha scheme (~/.config/micro) to render in
+# 24-bit instead of being approximated down to 256 colors.
+export MICRO_TRUECOLOR=1
 
 ## Claude Code
 # Reduce TUI repaint flicker. Exported (not just set) so the claude child
