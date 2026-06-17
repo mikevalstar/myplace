@@ -25,7 +25,10 @@ lazygit = "latest"
 fastfetch = "latest"
 d2 = "latest"
 git-lfs = "latest"
-tokei = "latest"
+# Note: tokei is NOT here. It stopped shipping prebuilt binaries after v12, so
+# mise's only backend for it is `cargo:` (source build) — and mise must not drive
+# cargo (Rust is rustup's, ADR-0007). It's installed via rustup's cargo in
+# run_onchange_provision.sh instead.
 # bun: JS/TS runtime used as a runner for some managed scripts (ADR-0014).
 # This is bun, not Node — Node stays with fnm (ADR-0007).
 bun = "latest"

@@ -171,7 +171,11 @@ if passwd -S "$NEW_USER" 2>/dev/null | grep -q ' P '; then
   echo ">>> $NEW_USER already has a password set; leaving it"
 else
   echo ">>> set a password for $NEW_USER:"
-  passwd "$NEW_USER"
+  # Retry until it sticks — a mismatch or too-weak password shouldn't abort the
+  # whole run and leave the user without a password (passwd exits non-zero then).
+  until passwd "$NEW_USER"; do
+    echo ">>> password not set (entries didn't match, or too weak) — try again" >&2
+  done
 fi
 REMOTE
 
