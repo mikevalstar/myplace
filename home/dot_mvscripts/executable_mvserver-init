@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+# mvserver-init — provision a fresh Linux server with myplace over SSH: create
+#   the mikevalstar user, then install + bootstrap myplace as that user.
+# mv_scripts: bootstrap a remote Linux server with myplace over SSH (creates the user, installs, bootstraps)
+#
+# Managed by myplace (chezmoi) — edit at home/dot_mvscripts/executable_mvserver-init
+# in the repo, not at ~/.mvscripts/mvserver-init. See docs/adrs/0014.
+#
+# Interactive by design: the remote steps run plain `sudo` (no NOPASSWD), so
+# you'll be prompted on the remote host for the connecting user's sudo password,
+# a new password for the created user, and that user's sudo password during
+# provisioning. Each SSH hop is its own sudo session, so expect to type the new
+# user's password a few times. Run it from any myplace-managed machine.
+
+set -euo pipefail
+
+show_help() {
+  local r=cat
+  if command -v gum >/dev/null 2>&1 && [ -t 1 ]; then r="gum format"; fi
+  $r <<'EOF'
+# mvserver-init
+
+Bootstrap a fresh Linux server with myplace, end to end:
+
+1. As the connecting user (e.g. `ubuntu`), create the new user, add it to the
+   sudo group, seed its `~/.ssh/authorized_keys` from the connecting user (so you
+   can log straight back in — `myplace bootstrap` then replaces it with the
+   chezmoi-managed keys), and set its password.
+2. As the new user, install myplace (`install.sh`) and run
+   `myplace bootstrap --profile server --yes` — which applies the dotfiles and
+   runs provisioning (zsh, oh-my-zsh, rustup, fnm, mise tools, …).
+3. Set the new user's login shell to zsh (unless `--no-chsh`).
+4. Print `myplace status` to confirm the machine landed in sync.
+
+## Usage
+
+    mvserver-init [options] [user@]host
+
+    -i FILE          SSH identity (private key) to authenticate with
+    -j HOST          SSH jump host (ProxyJump / bastion)
+    -u USER          connecting user if not given as user@host (default: ubuntu)
+    -n USER          user to create and bootstrap as (default: mikevalstar)
+    -p, --profile P  myplace profile to bootstrap (default: server)
+    --no-chsh        skip changing the new user's login shell to zsh
+    -y, --yes        skip the confirmation prompt
+    -h, --help       this help
+
+## Examples
+
+    mvserver-init -i ~/.ssh/aws.pem ubuntu@203.0.113.10
+    mvserver-init -i ~/.ssh/id_ed25519 -j bastion.example.com 10.0.0.5
+    mvserver-init -u admin -n mikevalstar 198.51.100.7
+
+## Exit codes
+
+    0   server bootstrapped and reported in sync (or status non-fatal)
+    1   a remote step failed
+    2   usage error
+EOF
+}
+
+identity=""
+jump=""
+connect_user=""
+new_user="mikevalstar"
+profile="server"
+do_chsh=true
+assume_yes=false
+target=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -i)            identity="${2:?-i needs a path}"; shift 2 ;;
+    -j)            jump="${2:?-j needs a host}"; shift 2 ;;
+    -u)            connect_user="${2:?-u needs a user}"; shift 2 ;;
+    -n)            new_user="${2:?-n needs a user}"; shift 2 ;;
+    -p|--profile)  profile="${2:?--profile needs a value}"; shift 2 ;;
+    --no-chsh)     do_chsh=false; shift ;;
+    -y|--yes)      assume_yes=true; shift ;;
+    -h|--help)     show_help; exit 0 ;;
+    -*)            echo "mvserver-init: unknown option: $1" >&2; echo "try: mvserver-init --help" >&2; exit 2 ;;
+    *)
+      if [ -n "$target" ]; then
+        echo "mvserver-init: unexpected extra argument: $1" >&2; exit 2
+      fi
+      target="$1"; shift ;;
+  esac
+done
+
+[ -n "$target" ] || { echo "mvserver-init: missing [user@]host" >&2; echo "try: mvserver-init --help" >&2; exit 2; }
+
+# Split user@host; an explicit user@ in the target wins over -u.
+if [ "${target#*@}" != "$target" ]; then
+  connect_user="${target%@*}"
+  host="${target#*@}"
+else
+  host="$target"
+  connect_user="${connect_user:-ubuntu}"
+fi
+
+[ -n "$host" ] || { echo "mvserver-init: empty host" >&2; exit 2; }
+
+# Common SSH/SCP connection options. accept-new records a brand-new host key
+# without an interactive yes/no but still rejects a changed one.
+ssh_opts=(-o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
+[ -n "$identity" ] && ssh_opts+=(-i "$identity")
+[ -n "$jump" ] && ssh_opts+=(-J "$jump")
+
+say() { printf '\033[1;35m==>\033[0m %s\n' "$1" >&2; }
+
+say "Target:        $connect_user@$host${jump:+  (via $jump)}"
+say "New user:      $new_user"
+say "Profile:       $profile"
+say "Set zsh shell: $([ "$do_chsh" = true ] && echo yes || echo 'no (--no-chsh)')"
+
+if [ "$assume_yes" != true ]; then
+  if [ ! -t 0 ]; then
+    echo "mvserver-init: not a TTY and --yes not given; refusing to run unattended (it needs passwords)." >&2
+    exit 2
+  fi
+  printf 'Proceed? [y/N] ' >&2
+  read -r reply
+  case "$reply" in
+    y|Y|yes|YES) ;;
+    *) echo "aborted." >&2; exit 0 ;;
+  esac
+fi
+
+# --- Step 1: create the user as the connecting user -------------------------
+# Build the root-side provisioning script locally, copy it over, and run it via
+# `sudo bash` on a real PTY. We deliberately do NOT pipe it on stdin: with `ssh
+# -t` the terminal is the data channel, so an interactive `sudo`/`passwd` would
+# never see your keystrokes if stdin were the script. scp + run sidesteps that.
+local_tmp="$(mktemp -t mvserver-usersetup.XXXXXX)"
+trap 'rm -f "$local_tmp"' EXIT
+remote_tmp="/tmp/mvserver-usersetup.$$.sh"
+
+cat >"$local_tmp" <<'REMOTE'
+#!/bin/bash
+set -euo pipefail
+CONNECT_USER="$1"; NEW_USER="$2"
+
+if ! id "$NEW_USER" >/dev/null 2>&1; then
+  echo ">>> creating user $NEW_USER"
+  useradd -m -s /bin/bash "$NEW_USER"
+else
+  echo ">>> user $NEW_USER already exists; reusing"
+fi
+
+# Grant sudo via whichever admin group this distro uses.
+if getent group sudo >/dev/null 2>&1; then
+  usermod -aG sudo "$NEW_USER"
+elif getent group wheel >/dev/null 2>&1; then
+  usermod -aG wheel "$NEW_USER"
+fi
+
+NEW_HOME="$(getent passwd "$NEW_USER" | cut -d: -f6)"
+CONNECT_HOME="$(getent passwd "$CONNECT_USER" | cut -d: -f6)"
+install -d -m 700 -o "$NEW_USER" -g "$NEW_USER" "$NEW_HOME/.ssh"
+if [ -f "$CONNECT_HOME/.ssh/authorized_keys" ]; then
+  echo ">>> seeding $NEW_USER authorized_keys from $CONNECT_USER (myplace bootstrap will replace these)"
+  cp "$CONNECT_HOME/.ssh/authorized_keys" "$NEW_HOME/.ssh/authorized_keys"
+  chown "$NEW_USER:$NEW_USER" "$NEW_HOME/.ssh/authorized_keys"
+  chmod 600 "$NEW_HOME/.ssh/authorized_keys"
+else
+  echo ">>> WARNING: $CONNECT_USER has no authorized_keys to copy; you may not be able to SSH in as $NEW_USER until bootstrap deploys keys" >&2
+fi
+
+# A password is required because provisioning runs plain `sudo` as this user.
+if passwd -S "$NEW_USER" 2>/dev/null | grep -q ' P '; then
+  echo ">>> $NEW_USER already has a password set; leaving it"
+else
+  echo ">>> set a password for $NEW_USER:"
+  passwd "$NEW_USER"
+fi
+REMOTE
+
+say "Step 1/4 — creating $new_user on $host (you may be prompted for ${connect_user}'s sudo password)"
+scp "${ssh_opts[@]}" "$local_tmp" "$connect_user@$host:$remote_tmp"
+ssh -t "${ssh_opts[@]}" "$connect_user@$host" \
+  "sudo bash '$remote_tmp' '$connect_user' '$new_user'; rm -f '$remote_tmp'"
+
+# --- Step 2: install + bootstrap myplace as the new user --------------------
+say "Step 2/4 — installing & bootstrapping myplace as $new_user (enter ${new_user}'s sudo password when asked)"
+ssh -t "${ssh_opts[@]}" "$new_user@$host" "
+  set -e
+  curl -fsSL https://raw.githubusercontent.com/mikevalstar/myplace/main/install.sh | sh
+  \$HOME/.local/bin/myplace bootstrap --profile '$profile' --yes
+"
+
+# --- Step 3: set zsh as the login shell -------------------------------------
+if [ "$do_chsh" = true ]; then
+  say "Step 3/4 — setting $new_user's login shell to zsh"
+  ssh -t "${ssh_opts[@]}" "$new_user@$host" '
+    z="$(command -v zsh || true)"
+    if [ -n "$z" ]; then
+      sudo chsh -s "$z" '"$new_user"' && echo ">>> login shell set to $z"
+    else
+      echo ">>> zsh not found after provisioning; leaving login shell unchanged" >&2
+    fi
+  '
+else
+  say "Step 3/4 — skipping chsh (--no-chsh)"
+fi
+
+# --- Step 4: verify ---------------------------------------------------------
+say "Step 4/4 — myplace status"
+ssh -t "${ssh_opts[@]}" "$new_user@$host" '$HOME/.local/bin/myplace status' || \
+  say "status reported drift or an error — inspect with: ssh ${identity:+-i <key> }$new_user@$host 'myplace status'"
+
+say "Done. Log in with:  ssh ${identity:+-i $identity }${jump:+-J $jump }$new_user@$host"

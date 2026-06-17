@@ -82,6 +82,14 @@ if ! command -v git >/dev/null 2>&1; then
 	fi
 fi
 
+# --- zsh (the shell our whole setup targets; not a mise tool) ---
+# macOS ships zsh as the default shell, but a stock Ubuntu/Debian server has only
+# bash — so without this the oh-my-zsh install below is skipped and the managed
+# ~/.zshrc never runs. ensure_tool no-ops on machines that already have zsh.
+# Setting zsh as the *login* shell (chsh) is left to the provisioning driver
+# (mvserver-init) so this apply never has to prompt for a password.
+ensure_tool zsh zsh
+
 # --- oh-my-zsh (keep our chezmoi-managed .zshrc) ---
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
 	if command -v zsh >/dev/null 2>&1; then
