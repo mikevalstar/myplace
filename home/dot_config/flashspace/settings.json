@@ -25,6 +25,11 @@
       "bundleIdentifier" : "com.1password.1password",
       "iconPath" : "/Applications/1Password.app/Contents/Resources/icon.icns",
       "name" : "1Password"
+    },
+    {
+      "bundleIdentifier" : "com.apple.finder",
+      "iconPath" : "/System/Library/CoreServices/Finder.app/Contents/Resources/Finder.icns",
+      "name" : "Finder"
     }
   ],
   "focusFrontmostWindow" : false,
@@ -32,7 +37,9 @@
   "loopWorkspaces" : true,
   "loopWorkspacesOnAllDisplays" : false,
   "menuBarDisplayAliases" : "",
+  "menuBarTitleScriptPath" : "",
   "menuBarTitleTemplate" : "$WORKSPACE",
+  "menuBarTitleUseScript" : false,
   "pipApps" : [
 
   ],
@@ -47,6 +54,7 @@
   "showMenuBarIcon" : true,
   "showMenuBarTitle" : true,
   "showRecentWorkspaceWhenActivatedTwice" : false,
+  "showWorkspaceSwitcher" : "opt+tab",
   "skipEmptyWorkspacesOnSwitch" : false,
   "spaceControlCurrentDisplayWorkspaces" : false,
   "spaceControlHideEmptyWorkspaces" : false,
