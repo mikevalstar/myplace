@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# portwhat — show what process is listening on each of the given TCP ports.
+# mv_scripts: show what process is listening on a list of TCP ports
+#
+# Managed by myplace (chezmoi) — edit at home/dot_mvscripts/executable_portwhat
+# in the repo, not at ~/.mvscripts/portwhat. See docs/adrs/0014.
+
+set -euo pipefail
+
+show_help() {
+  local r=cat
+  if command -v gum >/dev/null 2>&1 && [ -t 1 ]; then r="gum format"; fi
+  $r <<'EOF'
+# portwhat
+
+Report what (if anything) is listening on each TCP port you name. Read-only —
+it never kills anything. To free a port, see `killport`.
+
+Ports are taken from all arguments, split on commas and/or whitespace, so any
+of these work:
+
+    portwhat 3000
+    portwhat 3000 8080 5432
+    portwhat 3000,8080,5432
+    portwhat "3000, 8080 5432"
+
+Uses `lsof` when available, falling back to `fuser` (Linux).
+
+## Usage
+
+    portwhat <ports...>        show listeners for each port
+    portwhat <ports...> --json machine-readable JSON array
+    portwhat -h | --help       this help
+
+## Exit codes
+
+    0   every named port had a listener
+    1   at least one named port was free
+    2   usage error
+    4   no port-inspection tool (lsof/fuser) available
+EOF
+}
+
+json=false
+raw_args=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --json)    json=true ;;
+    -h|--help) show_help; exit 0 ;;
+    -*) echo "portwhat: unknown argument: $1" >&2; echo "try: portwhat --help" >&2; exit 2 ;;
+    *)  raw_args+=("$1") ;;
+  esac
+  shift
+done
+
+if [ "${#raw_args[@]}" -eq 0 ]; then
+  echo "portwhat: at least one port is required (e.g. portwhat 3000,8080)" >&2
+  exit 2
+fi
+
+# Split every argument on commas/whitespace into a flat, de-duplicated port list,
+# preserving first-seen order.
+ports=()
+seen=" "
+for a in "${raw_args[@]}"; do
+  for tok in ${a//,/ }; do
+    if ! printf '%s' "$tok" | grep -qE '^[0-9]+$'; then
+      echo "portwhat: not a numeric port: $tok" >&2
+      exit 2
+    fi
+    case "$seen" in *" $tok "*) ;; *) ports+=("$tok"); seen+="$tok " ;; esac
+  done
+done
+
+# Pick the inspection tool once up front.
+tool=""
+if command -v lsof >/dev/null 2>&1; then tool=lsof
+elif command -v fuser >/dev/null 2>&1; then tool=fuser
+else
+  echo "portwhat: need lsof or fuser to inspect ports." >&2
+  exit 4
+fi
+
+# Echo the listening pids for a port (one per line), or nothing.
+pids_for() {
+  local port="$1"
+  if [ "$tool" = lsof ]; then
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | sort -u || true
+  else
+    fuser "${port}/tcp" 2>/dev/null | tr -s ' ' '\n' | grep -E '^[0-9]+$' | sort -u || true
+  fi
+}
+
+any_free=false
+
+if $json; then
+  printf '['
+  first_port=true
+  for port in "${ports[@]}"; do
+    pids=$(pids_for "$port")
+    [ -n "$pids" ] || any_free=true
+    $first_port || printf ','
+    first_port=false
+    printf '\n  {"port":%s,"listeners":[' "$port"
+    first_pid=true
+    for p in $pids; do
+      cmd=$(ps -p "$p" -o comm= 2>/dev/null || echo "")
+      cmd=${cmd//\\/\\\\}; cmd=${cmd//\"/\\\"}
+      $first_pid || printf ','
+      first_pid=false
+      printf '{"pid":%s,"command":"%s"}' "$p" "$cmd"
+    done
+    printf ']}'
+  done
+  printf '\n]\n'
+  $any_free && exit 1
+  exit 0
+fi
+
+for port in "${ports[@]}"; do
+  pids=$(pids_for "$port")
+  if [ -z "$pids" ]; then
+    printf ':%s — free\n' "$port"
+    any_free=true
+    continue
+  fi
+  printf ':%s —\n' "$port"
+  for p in $pids; do
+    cmd=$(ps -p "$p" -o comm= 2>/dev/null || echo "?")
+    printf '  pid %-8s %s\n' "$p" "$cmd"
+  done
+done
+
+$any_free && exit 1
+exit 0
