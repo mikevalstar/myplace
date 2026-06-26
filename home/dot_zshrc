@@ -67,3 +67,7 @@ export BUN_INSTALL="$HOME/.bun"
 
 # claude with permissions skipped (danger zone)
 alias kennyloggins="claude --dangerously-skip-permissions"
+
+# google-cloud-sdk
+[ -f "$HOME/projects/google-cloud-sdk/path.zsh.inc" ] && . "$HOME/projects/google-cloud-sdk/path.zsh.inc"
+[ -f "$HOME/projects/google-cloud-sdk/completion.zsh.inc" ] && . "$HOME/projects/google-cloud-sdk/completion.zsh.inc"
