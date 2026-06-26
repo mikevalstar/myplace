@@ -71,3 +71,9 @@ alias kennyloggins="claude --dangerously-skip-permissions"
 # google-cloud-sdk
 [ -f "$HOME/projects/google-cloud-sdk/path.zsh.inc" ] && . "$HOME/projects/google-cloud-sdk/path.zsh.inc"
 [ -f "$HOME/projects/google-cloud-sdk/completion.zsh.inc" ] && . "$HOME/projects/google-cloud-sdk/completion.zsh.inc"
+
+# MiniMax Code
+[ -d "$HOME/.mavis/bin" ] && export PATH="$HOME/.mavis/bin:$PATH"
+
+# Antigravity CLI
+[ -d "$HOME/.local/bin" ] && export PATH="$HOME/.local/bin:$PATH"
