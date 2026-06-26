@@ -38,6 +38,7 @@
 [fetch]
 	prune = true           # drop local refs for branches deleted on the remote
 	pruneTags = true
+	writeCommitGraph = true # keep the commit-graph current on fetch — speeds up log/blame/merge-base (fleet-wide, no per-repo setup)
 [rebase]
 	autoStash = true       # stash/unstash a dirty tree around a rebase
 	updateRefs = true      # carry stacked branches along when rebasing
@@ -53,6 +54,14 @@
 	verbose = true         # show the diff in the commit-message editor
 [help]
 	autocorrect = prompt   # offer the intended command on a typo instead of running it
+[maintenance]
+	strategy = incremental # schedule used by `git maintenance run`/`start`: cheap, frequent upkeep
+# Background maintenance (commit-graph, gc, prefetch) is opt-in PER REPO via
+# `git maintenance start`, which also installs a launchd/systemd/cron job and
+# records the repo's absolute path in this config. That path is per-machine
+# state, so it's deliberately NOT templated here — run it by hand in repos you
+# want maintained (like the per-machine `gh ssh-key add` note below). The
+# `strategy` above just sets the schedule those registered repos follow.
 
 # SSH commit/tag signing (ADR-0015). Auto-enabled only when a signing key exists,
 # so a keyless machine (most servers) silently skips signing rather than failing

@@ -26,6 +26,13 @@ fastfetch = "latest"
 d2 = "latest"
 git-lfs = "latest"
 miller = "latest"
+yq = "latest"   # YAML/TOML/XML query+edit — the jq-shaped tool for the non-JSON configs
+sd = "latest"   # find-and-replace; saner regex/replace than sed (sharkdp-adjacent)
+fx = "latest"   # interactive JSON viewer — pairs with jq for exploring --json output
+# tlrc: the official tldr-pages client (binary `tldr`). Chosen over tealdeer
+# because tealdeer isn't in mise's registry (cargo-only, like tokei) whereas
+# tlrc ships prebuilt binaries here. Its config lives at ~/.config/tlrc/.
+tlrc = "latest"
 # Note: tokei is NOT here. It stopped shipping prebuilt binaries after v12, so
 # mise's only backend for it is `cargo:` (source build) — and mise must not drive
 # cargo (Rust is rustup's, ADR-0007). It's installed via rustup's cargo in

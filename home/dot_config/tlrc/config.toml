@@ -1,0 +1,58 @@
+# tlrc (tldr) config — managed by myplace (chezmoi). Edit in the repo at
+# home/dot_config/tlrc/config.toml, not here; local edits show as drift.
+#
+# Catppuccin Mocha theming to match ghostty/bat/starship/delta/fzf. tlrc is the
+# official tldr-pages client (binary `tldr`); chosen over tealdeer because it's
+# in mise's registry with prebuilt binaries. See docs/adrs/0011-catppuccin-theming.md.
+
+[updates]
+# Refresh the page cache automatically (first run fetches it). Two-week max age.
+auto_update = true
+max_age = 336
+
+[output]
+show_title = true
+example_prefix = "- "
+option_style = "long"
+
+# --- Catppuccin Mocha palette (same hexes as starship.toml / FZF_DEFAULT_OPTS) ---
+
+# Command name — mauve, bold.
+[style.title]
+color = { hex = "#cba6f7" }
+background = "default"
+bold = true
+
+# Page description — text.
+[style.description]
+color = { hex = "#cdd6f4" }
+background = "default"
+
+# Descriptions of examples — green.
+[style.bullet]
+color = { hex = "#a6e3a1" }
+background = "default"
+
+# Example command invocations — blue.
+[style.example]
+color = { hex = "#89b4fa" }
+background = "default"
+
+# URLs in the description — sky, italic + underline.
+[style.url]
+color = { hex = "#89dceb" }
+background = "default"
+italic = true
+underline = true
+
+# Inline `code` — yellow, italic.
+[style.inline_code]
+color = { hex = "#f9e2af" }
+background = "default"
+italic = true
+
+# Placeholders in examples ({{like_this}}) — peach, italic.
+[style.placeholder]
+color = { hex = "#fab387" }
+background = "default"
+italic = true

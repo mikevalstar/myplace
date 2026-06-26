@@ -36,10 +36,15 @@ else
     echo "atuin not found, and not setup" >&2
 fi
 
-fi  # end interactive-only block
+## pay-respects — type `f` after a failed/mistyped command to get a correction
+## (the Rust thefuck replacement; installed via run_onchange_provision.sh since
+## it isn't in mise's registry). Interactive-only: it binds an alias + reads the
+## last command from shell history, which is meaningless in an agent/CI shell.
+if [[ -x "$(command -v pay-respects)" ]]; then
+    eval "$(pay-respects zsh --alias)"
+fi
 
-## add scripts folder to the path
-export PATH="$PATH:$HOME/.config/scripts"
+fi  # end interactive-only block
 
 ## FZF
 # $HOME 
@@ -72,17 +77,14 @@ _fzf_compgen_dir() {
 ## Terminal Alacritty
 fpath+=${ZDOTDIR:-~}/.zsh_functions
 
-## Random ENV Vars
-export TEALDEER_CONFIG_DIR="$HOME/.config/tealdeer"
-
 ### Aliases / configs
 
 cd_to_dir() {
     local selected_dir
     if [[ -z "$1" ]]; then
-        selected_dir=$(fd -t d . $HOME | fzf +m --height 50% --preview 'tree -C {}')
+        selected_dir=$(fd -t d . $HOME | fzf +m --height 50% --preview 'eza --tree --color=always --icons=always --level=2 {}')
     else
-        selected_dir=$(fd -t d . $HOME "$1" | fzf +m --height 50% --preview 'tree -C {}')
+        selected_dir=$(fd -t d . $HOME "$1" | fzf +m --height 50% --preview 'eza --tree --color=always --icons=always --level=2 {}')
     fi
 
     if [[ -n "$selected_dir" ]]; then

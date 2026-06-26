@@ -174,6 +174,20 @@ if ! command -v fnm >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/fnm" ]; then
 	fi
 fi
 
+# --- pay-respects (the Rust `thefuck` replacement; not in mise's registry) ---
+# Its official installer drops a prebuilt binary into ~/.local/bin (already first
+# on PATH), so no cargo build and no brew dependency. The eval that wires up the
+# `f` alias lives in dot_mvdotfiles.zsh (interactive-only). Idempotent on PATH.
+if ! command -v pay-respects >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/pay-respects" ]; then
+	# Its installer extracts a .tar.zst or .zip; a stock server image may have
+	# neither zstd nor unzip. The fnm block above already ensures unzip, which the
+	# installer falls back to, so Node and pay-respects share that prerequisite.
+	log "installing pay-respects"
+	curl -sSfL https://raw.githubusercontent.com/iffse/pay-respects/main/install.sh \
+		| sh -s -- --bin-dir "$HOME/.local/bin" \
+		|| log "pay-respects install failed"
+fi
+
 # --- non-registry CLI tools (not in mise's registry; brew-if-present on macOS, ADR-0008) ---
 ensure_tool http httpie
 ensure_tool mosh mosh
