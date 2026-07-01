@@ -9,7 +9,9 @@ window-save-state = always
 
 # --- font ---
 font-family = "FiraCode Nerd Font Mono"
-font-size = 14
+# Font size is in points; points→pixels uses 72 DPI on macOS but 96 on Linux,
+# so the same value renders ~33% larger on Linux. Drop to 11 there to match.
+font-size = {{ if eq .chezmoi.os "linux" }}11{{ else }}14{{ end }}
 
 # --- input / macOS ---
 macos-option-as-alt = true
