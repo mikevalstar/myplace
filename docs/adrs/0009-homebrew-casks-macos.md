@@ -41,10 +41,11 @@ This **extends** ADR-0008 (formulae → casks) and inherits its guarantee: boots
 - Fonts land automatically on Macs that have Homebrew (all current ones); Linux servers correctly skip them; a brew-less Mac degrades to a logged note.
 - Homebrew casks are now a recognized *optional* macOS mechanism alongside formulae. We only ever call `brew install --cask <name>`; we don't manage taps or Homebrew itself, and nothing gates bootstrap on it.
 - Keep the cask set intentional — casks are heavier than CLI tools and macOS-only. Triage stays: mise registry → installer script → `ensure_tool` (CLI) / `ensure_cask` (macOS GUI/font).
-- If a Linux *desktop* ever joins the fleet and needs fonts, this ADR doesn't cover it — revisit with Option A (chezmoi externals) scoped to a desktop profile. Deliberately deferred (the current non-mac machines are all headless).
+- If a Linux *desktop* ever joins the fleet and needs fonts, this ADR doesn't cover it — revisit with a desktop-profile-scoped path. **Now handled: [ADR-0017](0017-linux-desktop-profile.md)** adds the `personal-linux` profile and installs the Nerd Fonts into `~/.local/share/fonts` from a profile-gated block in the provision script (not casks, not externals). This macOS cask path is unchanged.
 
 ## Related
 
 - [ADR-0008](0008-opportunistic-homebrew-macos.md) — opportunistic Homebrew for CLI formulae; this extends the same idea to casks
 - [ADR-0007](0007-provisioning-mechanism.md) — the provisioning split
+- [ADR-0017](0017-linux-desktop-profile.md) — extends fonts to the Linux desktop (into `~/.local/share/fonts`, profile-gated) — the case this ADR deferred
 - [managed-setup guide](../guides/managed-setup.md) — how to add a font/cask via `ensure_cask`

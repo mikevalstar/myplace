@@ -8,7 +8,7 @@ A TUI for getting machines from zero to fully-configured, and keeping them that 
 - **Update** — pull dotfile changes, upgrade tools, capture and push local tweaks
 - **Status** — see what's drifted, in either direction, on screen or as JSON
 
-Target machines: personal Macs, a work Mac, and assorted Linux servers — one common setup, many hosts.
+Target machines: personal Macs, a work Mac, a personal Linux desktop, and assorted Linux servers — one common setup, many hosts.
 
 This repo is a monorepo: the Go app, the chezmoi dotfiles (under [home/](home/), via `.chezmoiroot`), and the machines' mise config all live here — one clone carries everything ([ADR-0003](docs/adrs/0003-monorepo-app-dotfiles-mise.md)).
 
@@ -34,7 +34,7 @@ On a fresh machine, after the install one-liner:
 myplace
 ```
 
-With no existing setup detected, this opens the **bootstrap wizard**: it installs chezmoi and mise if missing, asks for the config repo (defaults to this one) and this machine's profile (`personal-mac` / `work-mac` / `server`), applies the dotfiles, installs the tools, and finishes with a status report.
+With no existing setup detected, this opens the **bootstrap wizard**: it installs chezmoi and mise if missing, asks for the config repo (defaults to this one) and this machine's profile (`personal-mac` / `personal-linux` / `work-mac` / `server`), applies the dotfiles, installs the tools, and finishes with a status report.
 
 For servers, skip the wizard entirely:
 
@@ -79,7 +79,7 @@ After install + a bootstrap, this is what lands where. Paths honor the XDG base 
 | `~/.local/share/chezmoi/` | chezmoi's **source clone** of this repo — the copy `myplace update` does `git pull` + apply on. The dotfiles live under its `home/` subdir (selected by [`.chezmoiroot`](home/)). Edit + push the repo, not the applied files. |
 | `~/.zshrc`, `~/.mvdotfiles.zsh`, `~/.gitconfig` | Dotfiles applied into `$HOME` from the source state. Editing these directly shows up as drift. |
 | `~/.config/mise/config.toml` | This machine's global mise tool set, rendered from `home/dot_config/mise/config.toml.tmpl`. |
-| `~/.ssh/config` | Rendered (macs only): host list pulled from a 1Password Document, plus non-secret global defaults from the template. Server IPs stay out of this public repo ([ADR-0016](docs/adrs/0016-secrets-in-dotfiles-via-1password.md)). Edit hosts in 1Password, not here — see below. |
+| `~/.ssh/config` | Rendered (desktops only — `personal-mac`/`work-mac`/`personal-linux`, not servers): host list pulled from a 1Password Document, plus non-secret global defaults from the template. Server IPs stay out of this public repo ([ADR-0016](docs/adrs/0016-secrets-in-dotfiles-via-1password.md)). Needs an authenticated `op`; the Linux desktop gets `op` from the provision script ([ADR-0017](docs/adrs/0017-linux-desktop-profile.md)). Edit hosts in 1Password, not here — see below. |
 | `~/.local/state/myplace/myplace.log` | Debug log (see below). Honors `XDG_STATE_HOME`; override with `MYPLACE_STATE_DIR`. Deliberately outside `~/.config` so it never lands in your dotfiles. |
 | `~/.oh-my-zsh`, `~/.cargo` + `~/.rustup`, `~/.local/share/fnm` | Installed by the provision script — oh-my-zsh, rustup (Rust), and fnm (Node): the things mise can't own ([ADR-0007](docs/adrs/0007-provisioning-mechanism.md)). |
 | `~/.local/share/mise/` | mise's own installed tools, shims, and runtimes. |

@@ -11,7 +11,7 @@ actors: [user, tui, chezmoi, mise]
 
 ## Goal
 
-Take a brand-new Mac or Linux server from "nothing installed" to fully configured: dotfiles applied, tools installed, and reporting in-sync — in one guided session.
+Take a brand-new Mac, Linux desktop, or Linux server from "nothing installed" to fully configured: dotfiles applied, tools installed, and reporting in-sync — in one guided session.
 
 ## Preconditions
 
@@ -30,7 +30,7 @@ Git is *not* a hard precondition: chezmoi bundles a built-in git sufficient for 
    - chezmoi: `sh -c "$(curl -fsLS get.chezmoi.io)" -- -b ~/.local/bin`
    - mise: `curl https://mise.run | sh`
    - No Homebrew dependency: servers won't have it, and the wizard must work the same everywhere. Brew-managed apps belong to the dotfiles' own run-once scripts, not to myplace.
-4. **Collect machine identity** (huh form): dotfiles repo URL, machine profile (`personal-mac` / `work-mac` / `server`), and any prompts the dotfiles templates need. Profile answers are written to chezmoi's data (`~/.config/chezmoi/chezmoi.toml`) so templates and myplace can branch on them — profiles share by default; differences are the exception. The template also writes `push`, currently true for `personal-mac`/`work-mac` and false for `server`.
+4. **Collect machine identity** (huh form): dotfiles repo URL, machine profile (`personal-mac` / `personal-linux` / `work-mac` / `server`), and any prompts the dotfiles templates need. Profile answers are written to chezmoi's data (`~/.config/chezmoi/chezmoi.toml`) so templates and myplace can branch on them — profiles share by default; differences are the exception. The template also writes `push`, true for every desktop profile (`personal-mac`/`personal-linux`/`work-mac`) and false for `server`. The desktop-vs-server split is a profile distinction, independent of OS: a `personal-linux` desktop also pulls the SSH host list from 1Password and gets terminal fonts, where a Linux `server` does neither ([ADR-0017](../adrs/0017-linux-desktop-profile.md)).
 5. **Apply dotfiles:** `chezmoi init --apply <repo-url>`. *(🚧 The planned `tea.ExecProcess` hand-off — so chezmoi can prompt or invoke askpass — and a first-bootstrap `chezmoi diff` review-before-apply step are **not yet built**: today bootstrap runs `chezmoi init --apply` directly with no pre-apply diff. Everyday update does have per-file incoming diff review.)*
 6. **Install tools:** `mise trust` on the now-present global config, then `mise install`. Stream progress; tool count and failures surface in the UI.
 7. **Run the dotfiles' own setup scripts** — chezmoi `run_once_`/`run_onchange_` scripts fire during step 5's apply automatically. *(🚧 Surfacing their output in the TUI rather than folding it into the apply stream is **not yet built**.)*

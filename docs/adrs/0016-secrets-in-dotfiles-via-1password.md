@@ -85,12 +85,15 @@ on every OS.
 
 - **Secrets stay out of the public repo** while the file remains chezmoi-managed,
   so bidirectional `status` (ADR's settled design point) still reports drift.
-- **`op` becomes a soft dependency** on machines that consume the secret (the
-  macs). chezmoi evaluates `onepasswordDocument` during *every* target-state
-  computation — `apply`, `status`, **and** `diff` — so `myplace status` on a mac
-  shells out to `op`. With the 1Password desktop app's CLI integration this is a
-  cached, no-prompt session in practice; if `op` is locked/absent, chezmoi errors
-  and `status` exits 3. Servers are unaffected (they never hit that branch).
+- **`op` becomes a soft dependency** on machines that consume the secret — every
+  non-`server` desktop, which since [ADR-0017](0017-linux-desktop-profile.md) means
+  the Macs **and** the `personal-linux` box. chezmoi evaluates `onepasswordDocument`
+  during *every* target-state computation — `apply`, `status`, **and** `diff` — so
+  `myplace status` on a desktop shells out to `op`. With the 1Password desktop app's
+  CLI integration this is a cached, no-prompt session in practice; if `op` is
+  locked/absent, chezmoi errors and `status` exits 3. On the Linux desktop `op` is
+  installed by the provision script (ADR-0017); on Macs by a brew cask. Servers are
+  unaffected (they never hit that branch).
 - **A manual step exists per secret file**: the 1Password Document must be created
   once (it can't be bootstrapped from the repo, by design). Documented in the
   managed-setup guide.

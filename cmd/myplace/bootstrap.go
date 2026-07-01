@@ -26,7 +26,7 @@ const (
 	defaultGitEmail = "mike@valstar.dev"
 )
 
-var profiles = []string{"personal-mac", "work-mac", "server"}
+var profiles = []string{"personal-mac", "personal-linux", "work-mac", "server"}
 
 type bootstrapOpts struct {
 	repo     string
@@ -46,14 +46,14 @@ func newBootstrapCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 			annRequired:    "profile,yes",
 			annExitCodes:   exitCodesConverge,
 			annInteractive: "true",
-			annNote:        "repo and git identity default to this setup's owner, so --profile (personal-mac|work-mac|server) and --yes are the only flags a headless run needs. Bootstrap streams progress to stderr and ends with a status summary; it has no --json document.",
+			annNote:        "repo and git identity default to this setup's owner, so --profile (personal-mac|personal-linux|work-mac|server) and --yes are the only flags a headless run needs. Bootstrap streams progress to stderr and ends with a status summary; it has no --json document.",
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runBootstrap(cmd, ch, ms, opts)
 		},
 	}
 	cmd.Flags().StringVar(&opts.repo, "repo", defaultRepo, "dotfiles repo (this repo, or a fork)")
-	cmd.Flags().StringVar(&opts.profile, "profile", "", "machine profile: personal-mac, work-mac, or server")
+	cmd.Flags().StringVar(&opts.profile, "profile", "", "machine profile: personal-mac, personal-linux, work-mac, or server")
 	cmd.Flags().StringVar(&opts.gitName, "git-name", "", "git user.name (blank = repo default)")
 	cmd.Flags().StringVar(&opts.gitEmail, "git-email", "", "git user.email (blank = repo default; e.g. set a work email here)")
 	cmd.Flags().BoolVar(&opts.yes, "yes", false, "run without prompts (requires --profile)")
@@ -84,7 +84,7 @@ func runBootstrap(cmd *cobra.Command, ch *chezmoi.Client, ms *mise.Client, opts 
 	}
 	if opts.yes {
 		if opts.profile == "" {
-			fmt.Fprintln(os.Stderr, "--yes requires --profile (personal-mac, work-mac, or server)")
+			fmt.Fprintln(os.Stderr, "--yes requires --profile (personal-mac, personal-linux, work-mac, or server)")
 			os.Exit(3)
 		}
 	} else {

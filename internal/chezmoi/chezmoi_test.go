@@ -112,6 +112,7 @@ func TestPushPolicy(t *testing.T) {
 		{name: "server default false", data: `{"profile":"server"}`, want: false, source: "profile:server"},
 		{name: "work mac default true", data: `{"profile":"work-mac"}`, want: true, source: "default"},
 		{name: "personal mac default true", data: `{"profile":"personal-mac"}`, want: true, source: "default"},
+		{name: "personal linux default true", data: `{"profile":"personal-linux"}`, want: true, source: "default"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

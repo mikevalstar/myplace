@@ -267,8 +267,90 @@ fi
 # "Integrate with 1Password CLI" setting once so it unlocks without a manual signin. ---
 ensure_cask 1password-cli
 
-# --- fonts (macOS-only Homebrew casks; the Linux fleet is headless servers — ADR-0009) ---
+# --- fonts (macOS Homebrew casks; the Linux *desktop* gets the same families
+# below, headless Linux servers get none — ADR-0009, ADR-0017) ---
 ensure_cask font-monaspace-nf
 ensure_cask font-symbols-only-nerd-font
 ensure_cask font-jetbrains-mono-nerd-font
 ensure_cask font-fira-code-nerd-font
+{{ if and (eq .chezmoi.os "linux") (ne .profile "server") -}}
+
+# --- Linux desktop extras (personal-linux): 1Password CLI + Nerd Fonts (ADR-0017) ---
+# The Macs get `op` and the Nerd Fonts as Homebrew casks; a Linux desktop has no
+# brew, so install both straight into $HOME. This whole block is gated by
+# chezmoi's .profile (that's why this script is a template) to non-server Linux,
+# so the headless Linux servers — same OS — skip it entirely.
+
+# 1Password CLI — for non-server profiles chezmoi renders ~/.ssh/config from the
+# host list stored in 1Password on every apply/status/diff (ADR-0016), so a Linux
+# desktop needs `op` on PATH exactly like the Macs do. Install the official static
+# binary into ~/.local/bin (first on PATH, no root, distro-agnostic — works on the
+# Arch/CachyOS box and on apt/dnf distros alike). Sign in via the 1Password desktop
+# app's "Integrate with 1Password CLI" setting so it unlocks without a manual login.
+if ! command -v op >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/op" ]; then
+	case "$(uname -m)" in
+		x86_64|amd64) op_arch="amd64" ;;
+		aarch64|arm64) op_arch="arm64" ;;
+		*) op_arch="" ;;
+	esac
+	if [ -z "$op_arch" ]; then
+		log "1Password CLI: unsupported arch $(uname -m); skipping"
+	elif ! command -v unzip >/dev/null 2>&1; then
+		# The op release ships as a .zip; the fnm block above already ensures
+		# unzip on Linux, but guard in case that step was skipped.
+		log "1Password CLI: unzip missing; skipping (install unzip, then re-run apply)"
+	else
+		# 1Password publishes no stable "latest" URL for the raw binary, so pin the
+		# version here and bump it on upgrades (or let the desktop app manage it).
+		op_version="v2.30.3"
+		log "installing 1Password CLI ($op_version)"
+		mkdir -p "$HOME/.local/bin"
+		op_tmp=$(mktemp -d)
+		if curl -fsSL "https://cache.agilebits.com/dist/1P/op2/pkg/$op_version/op_linux_${op_arch}_$op_version.zip" -o "$op_tmp/op.zip" \
+			&& unzip -o -q "$op_tmp/op.zip" op -d "$HOME/.local/bin"; then
+			chmod +x "$HOME/.local/bin/op"
+		else
+			log "1Password CLI install failed"
+		fi
+		rm -rf "$op_tmp"
+	fi
+fi
+
+# Nerd Fonts — the same families the Macs get as casks, installed into
+# ~/.local/share/fonts (fontconfig scans it recursively) so the glyphs in
+# starship, eza --icons, lazygit, etc. render. Per-family and idempotent: a family
+# whose subdir already exists is skipped, so re-applies don't re-download.
+nf_dir="$HOME/.local/share/fonts/NerdFonts"
+if ! command -v unzip >/dev/null 2>&1; then
+	log "Nerd Fonts: unzip missing; skipping"
+else
+	nf_latest=$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+		https://github.com/ryanoasis/nerd-fonts/releases/latest 2>/dev/null | sed 's#.*/tag/##')
+	if [ -z "$nf_latest" ]; then
+		log "Nerd Fonts: couldn't resolve latest release (offline?); skipping"
+	else
+		nf_installed=0
+		# Mirror the macOS casks: JetBrainsMono, FiraCode, Monaspace, plus the
+		# icon-only Symbols overlay (font-symbols-only-nerd-font's equivalent).
+		for family in JetBrainsMono FiraCode Monaspace NerdFontsSymbolsOnly; do
+			dest="$nf_dir/$family"
+			[ -d "$dest" ] && continue
+			log "installing Nerd Font: $family ($nf_latest)"
+			nf_tmp=$(mktemp -d)
+			if curl -fsSL "https://github.com/ryanoasis/nerd-fonts/releases/download/$nf_latest/$family.zip" -o "$nf_tmp/$family.zip" \
+				&& mkdir -p "$dest" \
+				&& unzip -o -q "$nf_tmp/$family.zip" -d "$dest"; then
+				nf_installed=1
+			else
+				log "$family font install failed"
+				rmdir "$dest" 2>/dev/null || true
+			fi
+			rm -rf "$nf_tmp"
+		done
+		if [ "$nf_installed" -eq 1 ] && command -v fc-cache >/dev/null 2>&1; then
+			log "refreshing font cache"
+			fc-cache -f "$HOME/.local/share/fonts" >/dev/null 2>&1 || log "fc-cache failed"
+		fi
+	fi
+fi
+{{ end -}}

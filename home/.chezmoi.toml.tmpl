@@ -3,7 +3,7 @@
      --promptChoice profile=server --promptString gitEmail=you@work.com */}}
 {{/* prompt strings match the data keys so `--promptString gitEmail=…` resolves
      (chezmoi matches --promptString by prompt text, not by the data key). */}}
-{{- $profile := promptChoiceOnce . "profile" "profile" (list "personal-mac" "work-mac" "server") -}}
+{{- $profile := promptChoiceOnce . "profile" "profile" (list "personal-mac" "personal-linux" "work-mac" "server") -}}
 {{- $gitName := promptStringOnce . "gitName" "gitName" "Mike Valstar" -}}
 {{- $gitEmail := promptStringOnce . "gitEmail" "gitEmail" "mike@valstar.dev" -}}
 
