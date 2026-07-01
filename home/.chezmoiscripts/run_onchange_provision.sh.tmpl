@@ -382,3 +382,32 @@ else
 	fi
 fi
 {{ end -}}
+{{ if ne .profile "server" -}}
+
+# --- herdr window-title plugin (all desktops; ADR-0018) ---
+# Pin the outer terminal title to "herdr@<host> · <workspace>" so multiplexed
+# herdr sessions across the fleet are told apart at a glance instead of every tab
+# reading "herdr". The plugin is two managed files under
+# ~/.config/herdr/machine-title-plugin/ (applied by chezmoi as dotfiles). herdr
+# has no config-based auto-load or discovery dir, so registration is an explicit
+# `herdr plugin link`, recorded in ~/.config/herdr/plugins.json. It's idempotent —
+# herdr keys plugins by id, so re-linking on every apply just updates in place.
+# herdr is a mise tool and this script runs before `mise install`, so on a
+# brand-new machine herdr is absent here and the guard skips; it links on the
+# next `myplace update`, once mise has installed herdr. Servers run headless and
+# never need an outer-terminal title, so this is non-server gated. The manifest
+# hash below re-runs this onchange script whenever the plugin manifest changes.
+# plugin manifest hash: {{ include "dot_config/herdr/machine-title-plugin/herdr-plugin.toml" | sha256sum }}
+if command -v herdr >/dev/null 2>&1; then
+	mt_plugin="$HOME/.config/herdr/machine-title-plugin"
+	if [ -f "$mt_plugin/herdr-plugin.toml" ]; then
+		if herdr plugin link "$mt_plugin" >/dev/null 2>&1; then
+			log "linked herdr machine-title plugin"
+		else
+			log "herdr machine-title plugin link failed"
+		fi
+	else
+		log "herdr machine-title plugin files not yet applied; skipping link"
+	fi
+fi
+{{ end -}}

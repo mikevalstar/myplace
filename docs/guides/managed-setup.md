@@ -98,6 +98,30 @@ so our scripts don't mingle with mise/installer binaries) through the normal
 - You own portability: use `$HOME` not `/Users/<you>`, guard against missing deps, and
   keep shell scripts POSIX-safe enough for the headless Linux servers.
 
+### A herdr plugin (desktops)
+
+herdr (the terminal multiplexer, a mise tool) has no config-declared or
+auto-discovered plugins — a plugin is only ever registered by an explicit
+`herdr plugin link <path>`, persisted to `~/.config/herdr/plugins.json`. To ship
+one to the fleet, track its files as managed dotfiles and link them from the
+provision script. The worked example is the machine-title plugin
+([ADR-0018](../adrs/0018-herdr-machine-title-plugin.md)), which sets the terminal
+title to `herdr@<host> · <workspace>`:
+
+1. **The plugin files** live at `home/dot_config/herdr/machine-title-plugin/`
+   (`herdr-plugin.toml` + `executable_set-title.sh`), applied by chezmoi to
+   `~/.config/herdr/machine-title-plugin/`. Keep the script POSIX `sh`; it may use
+   managed tools like `jq` (they're on `PATH` for the herdr server) but should
+   fall back if one is missing.
+2. **Register it in the provision script**, non-server gated
+   (`{{ "{{ if ne .profile \"server\" }}" }}…`) — servers are headless. `herdr plugin link`
+   is idempotent (keyed by plugin id), so re-running it every apply is safe; guard
+   on `command -v herdr` because provision runs before `mise install` (herdr is a
+   mise tool, so absent on a brand-new machine's first apply — it links on the next
+   `myplace update`). Add the manifest to the onchange hash
+   (`# … {{ "{{ include \"dot_config/herdr/machine-title-plugin/herdr-plugin.toml\" | sha256sum }}" }}`)
+   so a plugin change re-triggers the link.
+
 ### A dotfile that carries secrets (1Password)
 
 When a managed file holds something that must not land in the public repo (server
