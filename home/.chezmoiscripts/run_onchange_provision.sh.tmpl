@@ -277,38 +277,58 @@ ensure_cask font-fira-code-nerd-font
 
 # --- Linux desktop extras (personal-linux): 1Password CLI + Nerd Fonts (ADR-0017) ---
 # The Macs get `op` and the Nerd Fonts as Homebrew casks; a Linux desktop has no
-# brew, so install both straight into $HOME. This whole block is gated by
-# chezmoi's .profile (that's why this script is a template) to non-server Linux,
-# so the headless Linux servers — same OS — skip it entirely.
+# brew, so install the Nerd Fonts into $HOME and `op` (which needs root for the
+# desktop-app integration, see below) into /usr/local/bin. This whole block is
+# gated by chezmoi's .profile (that's why this script is a template) to non-server
+# Linux, so the headless Linux servers — same OS — skip it entirely.
 
 # 1Password CLI — for non-server profiles chezmoi renders ~/.ssh/config from the
 # host list stored in 1Password on every apply/status/diff (ADR-0016), so a Linux
-# desktop needs `op` on PATH exactly like the Macs do. Install the official static
-# binary into ~/.local/bin (first on PATH, no root, distro-agnostic — works on the
-# Arch/CachyOS box and on apt/dnf distros alike). Sign in via the 1Password desktop
-# app's "Integrate with 1Password CLI" setting so it unlocks without a manual login.
-if ! command -v op >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/op" ]; then
+# desktop needs a working `op`. The catch (learned the hard way, ADR-0017): the
+# desktop-app integration only trusts an `op` binary that is root-owned and setgid
+# to the `onepassword-cli` group. The app verifies the connecting CLI's *client
+# type* by that group via SO_PEERCRED — a user-owned binary is rejected with
+# "connecting to desktop app: connection reset", and a binary in the wrong group
+# (e.g. the browser integration's `onepassword`) with "unsupportedClientType". So
+# install to /usr/local/bin under sudo, create the group, and setgid it. Then
+# enable "Integrate with 1Password CLI" in the app and sign in. A user-owned
+# ~/.local/bin/op would install cleanly but silently fail every vault read, so if
+# root isn't available we log the exact manual steps instead of leaving that trap.
+if ! command -v op >/dev/null 2>&1; then
+	op_sudo=""
+	[ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && op_sudo="sudo"
 	case "$(uname -m)" in
 		x86_64|amd64) op_arch="amd64" ;;
 		aarch64|arm64) op_arch="arm64" ;;
 		*) op_arch="" ;;
 	esac
+	# Pinned: 1Password has no stable "latest" URL for the raw binary, and it must
+	# not lag the desktop app — an older op fails a newer app with
+	# "unsupportedClientType". Bump on upgrades (check the release history).
+	op_version="v2.34.1"
+	op_url="https://cache.agilebits.com/dist/1P/op2/pkg/$op_version/op_linux_${op_arch}_$op_version.zip"
 	if [ -z "$op_arch" ]; then
 		log "1Password CLI: unsupported arch $(uname -m); skipping"
 	elif ! command -v unzip >/dev/null 2>&1; then
 		# The op release ships as a .zip; the fnm block above already ensures
 		# unzip on Linux, but guard in case that step was skipped.
 		log "1Password CLI: unzip missing; skipping (install unzip, then re-run apply)"
+	elif [ -z "$op_sudo" ] && [ "$(id -u)" -ne 0 ]; then
+		log "1Password CLI: root required for the setgid app-integration install; run manually:"
+		log "  sudo groupadd -f onepassword-cli"
+		log "  curl -fsSL $op_url -o /tmp/op.zip && unzip -o /tmp/op.zip op -d /tmp"
+		log "  sudo install -o root -g onepassword-cli -m 2755 /tmp/op /usr/local/bin/op"
 	else
-		# 1Password publishes no stable "latest" URL for the raw binary, so pin the
-		# version here and bump it on upgrades (or let the desktop app manage it).
-		op_version="v2.30.3"
-		log "installing 1Password CLI ($op_version)"
-		mkdir -p "$HOME/.local/bin"
+		log "installing 1Password CLI ($op_version, /usr/local/bin, root:onepassword-cli setgid)"
 		op_tmp=$(mktemp -d)
-		if curl -fsSL "https://cache.agilebits.com/dist/1P/op2/pkg/$op_version/op_linux_${op_arch}_$op_version.zip" -o "$op_tmp/op.zip" \
-			&& unzip -o -q "$op_tmp/op.zip" op -d "$HOME/.local/bin"; then
-			chmod +x "$HOME/.local/bin/op"
+		# mode 2755 = setgid + rwxr-xr-x, mirroring the app's own /opt/1Password
+		# helpers; only root can setgid to onepassword-cli, which is what makes the
+		# binary trustworthy to the app.
+		if curl -fsSL "$op_url" -o "$op_tmp/op.zip" \
+			&& unzip -o -q "$op_tmp/op.zip" op -d "$op_tmp" \
+			&& $op_sudo groupadd -f onepassword-cli \
+			&& $op_sudo install -o root -g onepassword-cli -m 2755 "$op_tmp/op" /usr/local/bin/op; then
+			:
 		else
 			log "1Password CLI install failed"
 		fi
