@@ -1,0 +1,123 @@
+[general]
+working_directory = "None"
+live_config_reload = true
+
+[env]
+TERM = "xterm-256color"
+WINIT_X11_SCALE_FACTOR = "1.0"
+
+[window]
+dimensions = { columns = 100, lines = 30 }
+padding = { x = 10, y = 10 }
+dynamic_padding = true
+decorations = "Full"
+opacity = 0.9
+title = "Alacritty@CachyOS"
+class = { instance = "Alacritty", general = "Alacritty" }
+decorations_theme_variant = "Dark"
+
+[scrolling]
+history = 10000
+multiplier = 3
+
+[font]
+normal = { family = "FiraCode Nerd Font Mono", style = "Regular" }
+bold = { family = "FiraCode Nerd Font Mono", style = "Bold" }
+italic = { family = "FiraCode Nerd Font Mono", style = "Regular" }
+bold_italic = { family = "FiraCode Nerd Font Mono", style = "Bold" }
+size = 14.0
+
+[colors]
+# Catppuccin Mocha — matches Ghostty's theme
+[colors.primary]
+background = "#1e1e2e"
+foreground = "#cdd6f4"
+dim_foreground = "#7f849c"
+bright_foreground = "#cdd6f4"
+
+[colors.cursor]
+text = "#1e1e2e"
+cursor = "#f5e0dc"
+
+[colors.vi_mode_cursor]
+text = "#1e1e2e"
+cursor = "#b4befe"
+
+[colors.search.matches]
+foreground = "#1e1e2e"
+background = "#a6adc8"
+
+[colors.search.focused_match]
+foreground = "#1e1e2e"
+background = "#a6e3a1"
+
+[colors.footer_bar]
+foreground = "#1e1e2e"
+background = "#a6adc8"
+
+[colors.hints.start]
+foreground = "#1e1e2e"
+background = "#f9e2af"
+
+[colors.hints.end]
+foreground = "#1e1e2e"
+background = "#a6adc8"
+
+[colors.selection]
+text = "#1e1e2e"
+background = "#f5e0dc"
+
+[colors.normal]
+black = "#45475a"
+red = "#f38ba8"
+green = "#a6e3a1"
+yellow = "#f9e2af"
+blue = "#89b4fa"
+magenta = "#f5c2e7"
+cyan = "#94e2d5"
+white = "#bac2de"
+
+[colors.bright]
+black = "#585b70"
+red = "#f38ba8"
+green = "#a6e3a1"
+yellow = "#f9e2af"
+blue = "#89b4fa"
+magenta = "#f5c2e7"
+cyan = "#94e2d5"
+white = "#a6adc8"
+
+[selection]
+semantic_escape_chars = ",│`|:\"' ()[]{}<>\t"
+save_to_clipboard = true
+
+[cursor]
+style = { shape = "Underline", blinking = "Off" }
+unfocused_hollow = true
+thickness = 0.15
+
+[mouse]
+hide_when_typing = true
+bindings = [
+{ mouse = "Middle", mods = "None", action = "PasteSelection" },
+]
+
+[keyboard]
+bindings = [
+{ key = "Paste", mods = "None", action = "Paste" },
+{ key = "Copy", mods = "None", action = "Copy" },
+{ key = "L", mods = "Control", action = "ClearLogNotice" },
+{ key = "L", mods = "Control", mode = "~Vi", chars = "\f" },
+{ key = "PageUp", mods = "Shift", mode = "~Alt", action = "ScrollPageUp" },
+{ key = "PageDown", mods = "Shift", mode = "~Alt", action = "ScrollPageDown" },
+{ key = "Home", mods = "Shift", mode = "~Alt", action = "ScrollToTop" },
+{ key = "End", mods = "Shift", mode = "~Alt", action = "ScrollToBottom" },
+{ key = "V", mods = "Control|Shift", action = "Paste" },
+{ key = "C", mods = "Control|Shift", action = "Copy" },
+{ key = "F", mods = "Control|Shift", action = "SearchForward" },
+{ key = "B", mods = "Control|Shift", action = "SearchBackward" },
+{ key = "C", mods = "Control|Shift", mode = "Vi", action = "ClearSelection" },
+{ key = "Key0", mods = "Control", action = "ResetFontSize" },
+# send a newline instead of submitting — multiline input in Claude Code / REPLs
+{ key = "Return", mods = "Shift", chars = "\n" },
+]

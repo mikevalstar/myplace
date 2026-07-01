@@ -336,6 +336,14 @@ if ! command -v op >/dev/null 2>&1; then
 	fi
 fi
 
+# Wayland clipboard tools — a Linux desktop is Wayland (KDE/GNOME), where copy/
+# paste for CLI apps goes through wl-copy/wl-paste. Claude Code shells out to them
+# for image paste and `/copy` (it probes once at startup and caches the result, so
+# without them those fail silently); the Macs get this from the OS. No X11/xclip
+# fallback here — the desktop is Wayland. Servers skip it (this whole block is
+# non-server gated). ensure_tool checks the wl-copy command, installs the package.
+ensure_tool wl-copy wl-clipboard
+
 # Nerd Fonts — the same families the Macs get as casks, installed into
 # ~/.local/share/fonts (fontconfig scans it recursively) so the glyphs in
 # starship, eza --icons, lazygit, etc. render. Per-family and idempotent: a family
