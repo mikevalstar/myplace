@@ -2,3 +2,12 @@ onboarding = false
 
 [ui.toast]
 delivery = "system"
+
+# fzf command palette (jt.command-palette, ADR-0020): prefix+p opens a fuzzy
+# picker over every plugin action. herdr 0.7 doesn't bind keys declared in a
+# plugin manifest, so the binding has to live here in the config.
+[[keys.command]]
+key = "prefix+p"
+type = "plugin_action"
+command = "jt.command-palette.open"
+description = "Command palette"

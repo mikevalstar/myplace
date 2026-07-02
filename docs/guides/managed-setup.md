@@ -131,6 +131,20 @@ SSH-attached server's herdr sets the title you see locally:
    (`# … {{ "{{ include \"dot_config/herdr/machine-title-plugin/herdr-plugin.toml\" | sha256sum }}" }}`)
    so a plugin change re-triggers the link.
 
+A **third-party** plugin (one you don't vendor into the repo) is registered with
+`herdr plugin install <owner>/<repo>` instead of `link`, and the semantics differ:
+`install` fetches from GitHub, so it's **not** safe to re-run every apply — guard
+on `herdr plugin list` not already containing the plugin id and install once, and
+pass `--yes` (apply is non-interactive). The worked example is the fzf command
+palette ([ADR-0020](../adrs/0020-herdr-command-palette-plugin.md), `jt.command-palette`,
+installed from `JanTvrdik/herdr-command-palette`); it sits in the same
+`command -v herdr` block as the machine-title `link`, so ADR-0019's onchange-hash
+cold-start machinery retries it once herdr appears. Trade-off: install-once means
+it doesn't auto-track upstream — re-install by hand to bump. If the plugin binds
+behaviour to a key, note that **herdr 0.7 does not bind keys from a plugin
+manifest** — add a `[[keys.command]]` with `type = "plugin_action"` to the managed
+`home/dot_config/herdr/config.toml` (that's where the palette's `prefix+p` lives).
+
 ### A dotfile that carries secrets (1Password)
 
 When a managed file holds something that must not land in the public repo (server

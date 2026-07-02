@@ -419,4 +419,19 @@ if command -v herdr >/dev/null 2>&1; then
 	else
 		log "herdr machine-title plugin files not yet applied; skipping link"
 	fi
+
+	# --- command-palette plugin (third-party, from GitHub; ADR-0020) ---
+	# An fzf fuzzy-picker over all plugin actions, bound to prefix+p in the managed
+	# config.toml. Unlike the machine-title plugin above (our own files, `link`ed
+	# idempotently by id), this is `install`ed from GitHub — so install ONCE, guarded
+	# on presence: re-fetching every apply is wasteful and fails offline. --yes keeps
+	# the non-interactive apply from prompting (ADR-0006). It has no build step and its
+	# fzf/jq deps are fleet-wide mise tools needed only at use time, so running before
+	# `mise install` is fine. It does NOT auto-update — re-install by hand to bump
+	# (`herdr plugin uninstall jt.command-palette && herdr plugin install ...`).
+	if ! herdr plugin list 2>/dev/null | grep -q 'jt\.command-palette'; then
+		log "installing herdr command-palette plugin (jt.command-palette)"
+		herdr plugin install JanTvrdik/herdr-command-palette --yes >/dev/null 2>&1 \
+			|| log "herdr command-palette plugin install failed"
+	fi
 fi
