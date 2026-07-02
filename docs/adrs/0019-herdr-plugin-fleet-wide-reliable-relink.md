@@ -48,13 +48,20 @@ Keep Option C (the repo-managed plugin, registered by `herdr plugin link`), but:
 - **Remove the `ne .profile "server"` gate.** The link block runs on every
   profile. The plugin *files* were already applied everywhere (never in
   `.chezmoiignore`), so only the provision step changes.
-- **Make the onchange script re-fire when herdr appears.** Add herdr's resolved
-  path to the script's hash via a comment line — `# herdr on PATH: {{ lookPath "herdr" }}`.
-  When herdr goes from absent → present on PATH, `lookPath`'s output changes, the
-  script's content hash changes, and chezmoi re-runs it exactly once — the first
-  `myplace update` after mise installs herdr — so the guard-skipped link is
-  retried automatically. `lookPath` returns an empty string (not an error) when
-  the binary is missing, so it's safe to evaluate on a machine without herdr.
+- **Make the onchange script re-fire when herdr appears.** Fold herdr's presence
+  into the script's hash via a comment line —
+  `# herdr installed (1=yes): {{ if lookPath "herdr" }}1{{ else }}0{{ end }}`.
+  When herdr goes from absent → present, this flips `0`→`1`, the script's content
+  hash changes, and chezmoi re-runs it exactly once — the first `myplace update`
+  after mise installs herdr — so the guard-skipped link is retried automatically.
+  `lookPath` returns an empty string (not an error) when the binary is missing, so
+  it's safe to evaluate on a machine without herdr. **It emits a 1/0 boolean, not
+  lookPath's raw path**, because herdr's resolved path is environment-dependent
+  (mise's install dir when mise is activated vs `mise/shims/herdr` on a bare
+  PATH); hashing the raw path would make the onchange state differ between
+  myplace's `--no-tty` runs and an interactive shell, leaving `chezmoi status`
+  perpetually dirty. The boolean is the same in every environment that can find
+  herdr.
 
 ## Options considered for the relink
 

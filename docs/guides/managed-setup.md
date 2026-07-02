@@ -121,9 +121,12 @@ SSH-attached server's herdr sets the title you see locally:
    because provision runs before `mise install` (herdr is a mise tool, so absent on
    a brand-new machine's first apply). **The catch:** a `run_onchange_` script only
    re-runs when its content changes, so a `command -v herdr` skip is *not* retried
-   on later applies on its own. Put herdr's path in the onchange hash
-   (`# herdr on PATH: {{ "{{ lookPath \"herdr\" }}" }}`) so the script re-fires the
-   first update after mise installs herdr and the skipped link is retried. Also add
+   on later applies on its own. Fold herdr's presence into the onchange hash as a
+   1/0 boolean (`# herdr installed: {{ "{{ if lookPath \"herdr\" }}1{{ else }}0{{ end }}" }}`)
+   so the script re-fires the first update after mise installs herdr and the
+   skipped link is retried. Use the boolean, not lookPath's raw path — the path is
+   env-dependent (install dir vs shims) and would leave `chezmoi status` dirty.
+   Also add
    the manifest to the hash
    (`# … {{ "{{ include \"dot_config/herdr/machine-title-plugin/herdr-plugin.toml\" | sha256sum }}" }}`)
    so a plugin change re-triggers the link.

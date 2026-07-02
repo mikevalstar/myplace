@@ -397,13 +397,16 @@ fi
 #
 # Ordering/re-run: this script runs before `mise install` (ADR-0007), so on a
 # brand-new machine herdr is absent and the `command -v herdr` guard skips the
-# link. The `herdr on PATH` line below puts lookPath's result into this onchange
-# script's hash, so the script re-fires the moment herdr appears on PATH — i.e.
+# link. The `herdr installed` line below folds herdr's presence into this
+# onchange script's hash, so the script re-fires the moment herdr appears — i.e.
 # the first `myplace update` after mise installs it — and the skipped link is
 # retried with no manifest change needed. (A run_onchange_ script otherwise never
-# re-runs on its own; that gap is why early machines never got linked.) The
-# manifest hash re-runs it whenever the plugin itself changes.
-# herdr on PATH: {{ lookPath "herdr" }}
+# re-runs on its own; that gap is why early machines never got linked.) It's a
+# 1/0 boolean, not lookPath's raw path, on purpose: the path differs by
+# environment (mise install dir when activated vs mise/shims on a bare PATH), so
+# emitting the path would make the hash env-dependent and leave `chezmoi status`
+# perpetually dirty. The manifest hash re-runs it whenever the plugin changes.
+# herdr installed (1=yes): {{ if lookPath "herdr" }}1{{ else }}0{{ end }}
 # plugin manifest hash: {{ include "dot_config/herdr/machine-title-plugin/herdr-plugin.toml" | sha256sum }}
 if command -v herdr >/dev/null 2>&1; then
 	mt_plugin="$HOME/.config/herdr/machine-title-plugin"
