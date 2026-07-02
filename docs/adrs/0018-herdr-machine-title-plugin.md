@@ -1,11 +1,11 @@
 ---
 title: ADR-0018 — A repo-managed herdr plugin for the terminal title
-status: accepted
+status: superseded
 created: 2026-07-01
-updated: 2026-07-01
+updated: 2026-07-02
 tags: [herdr, provisioning, desktop, terminal, plugins]
 supersedes: null
-superseded-by: null
+superseded-by: ADR-0019
 ---
 
 # ADR-0018: A repo-managed herdr plugin for the terminal title
