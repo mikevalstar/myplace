@@ -2,7 +2,7 @@
 title: Logging
 status: accepted
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-07-03
 tags: [logging, debugging, observability]
 phase: 1
 ---
@@ -56,6 +56,10 @@ Single backup rotation: when `myplace.log` exceeds ~5 MB at startup, it's rename
 ### Robustness
 
 Logging must never break a run. If the state dir can't be created or the file can't be opened, myplace falls back to a no-op logger and proceeds silently — a machine with a read-only `$HOME` still bootstraps.
+
+### Reading it back in the TUI
+
+The dashboard consumes the log read-only in two places ([TUI dashboard layout](tui-dashboard.md)): the **Activity pane** tails the last few hundred lines on a 1-second tick, and the **`a` activity view** browses a larger tail (~1 MB) full-screen with scrolling, substring filtering, and follow mode. Both read only a bounded tail window of the file, so the tick stays cheap regardless of log size.
 
 ### Relationship to `--json`
 

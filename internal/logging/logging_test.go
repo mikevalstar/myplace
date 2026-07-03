@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,6 +54,34 @@ func TestNewToleratesUnwritableDir(t *testing.T) {
 	l, closeLog := New("test")
 	defer closeLog()
 	l.Info("should not panic") // writing to discard is fine
+}
+
+func TestTailLines(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("MYPLACE_STATE_DIR", dir)
+	var b strings.Builder
+	for i := 1; i <= 100; i++ {
+		fmt.Fprintf(&b, "line %d\n", i)
+	}
+	if err := os.WriteFile(filepath.Join(dir, fileName), []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := TailLines(5, 1<<20)
+	if len(got) != 5 || got[0] != "line 96" || got[4] != "line 100" {
+		t.Errorf("TailLines(5) should return the last 5 lines, got %v", got)
+	}
+	// A window smaller than the file must drop the partial first line and
+	// still end at the newest line.
+	small := TailLines(1000, 64)
+	if len(small) == 0 || small[len(small)-1] != "line 100" {
+		t.Errorf("small window should still end at the newest line, got %v", small)
+	}
+	for _, ln := range small {
+		if !strings.HasPrefix(ln, "line ") {
+			t.Errorf("partial first line should be dropped, got %q", ln)
+		}
+	}
 }
 
 func TestTail(t *testing.T) {

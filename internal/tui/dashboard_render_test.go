@@ -10,8 +10,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/mikevalstar/myplace/internal/doctor"
 	"github.com/mikevalstar/myplace/internal/drift"
 	"github.com/mikevalstar/myplace/internal/outdated"
+	"github.com/mikevalstar/myplace/internal/release"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -19,7 +21,7 @@ func ptr[T any](v T) *T { return &v }
 // sampleModel builds a populated, non-loading dashboard for render checks. The
 // detail viewport is sized and synced so the master-detail panel has content.
 func sampleModel(w, h int) Model {
-	m := New(nil, nil, nil, nil, "0.1.0")
+	m := New(nil, nil, nil, nil, "0.1.0", doctor.Options{})
 	m.loading = false
 	m.invLoading = false
 	m.width, m.height = w, h
@@ -233,6 +235,198 @@ func TestRenderOutdatedView(t *testing.T) {
 	}
 }
 
+// sampleDoctorReport is a mixed pass/warn/fail preflight for the `d` view.
+func sampleDoctorReport() *doctor.Report {
+	return &doctor.Report{
+		Schema:    doctor.Schema,
+		Machine:   "mikes-macbook-air",
+		Profile:   "personal-mac",
+		CheckedAt: time.Date(2026, 7, 3, 10, 0, 0, 0, time.UTC),
+		Verdict:   doctor.VerdictFail,
+		Checks: []doctor.Check{
+			{ID: "chezmoi_installed", Label: "chezmoi installed", Status: doctor.StatusPass, Detail: "2.52.0"},
+			{ID: "dotfiles_remote", Label: "dotfiles remote", Status: doctor.StatusWarn, Detail: "could not reach origin (offline?)"},
+			{ID: "path", Label: "PATH", Status: doctor.StatusFail, Detail: "~/.local/bin not on PATH",
+				Remedy: `add 'export PATH="$HOME/.local/bin:$PATH"' to your shell profile`},
+		},
+	}
+}
+
+// TestRenderDoctorView checks the `d` screen renders the verdict line, every
+// check with its status glyph, and remedies — without overflow.
+func TestRenderDoctorView(t *testing.T) {
+	for _, w := range []int{80, 120} {
+		h := 30
+		m := sampleModel(w, h)
+		m.mode = modeDoctor
+		m.doctorRep = sampleDoctorReport()
+		m.vp = viewport.New(w, h-3)
+		m.vp.SetContent(m.doctorContent())
+		out := m.doctorView()
+		assertNoOverflow(t, "doctor", out, w)
+		for _, want := range []string{"problems found — 1 failed, 1 warning(s)", "chezmoi installed", "dotfiles remote", "✓", "⚠", "✗", "→ add 'export PATH="} {
+			if !strings.Contains(out, want) {
+				t.Errorf("w=%d doctor view missing %q", w, want)
+			}
+		}
+	}
+
+	// While the checks run, the body is a centered spinner, not stale content.
+	m := sampleModel(100, 30)
+	m.mode = modeDoctor
+	m.doctorLoading = true
+	m.vp = viewport.New(100, 27)
+	out := m.doctorView()
+	assertNoOverflow(t, "doctor-loading", out, 100)
+	if !strings.Contains(out, "running doctor checks") {
+		t.Error("loading doctor view should show the in-flight notice")
+	}
+}
+
+// TestRenderActivityView checks the `a` screen renders the log tail, the
+// filter narrows it case-insensitively, and error lines are emphasized.
+func TestRenderActivityView(t *testing.T) {
+	for _, w := range []int{80, 120} {
+		h := 30
+		m := sampleModel(w, h)
+		m.mode = modeActivity
+		m.follow = true
+		m.actLines = []string{
+			`2026-07-03T10:00:00-04:00 DEBU exec cmd=tui tool=chezmoi args="status"`,
+			`2026-07-03T10:00:01-04:00 ERRO exec failed cmd=tui tool=mise err="exit 1"`,
+			`2026-07-03T10:00:02-04:00 INFO status cmd=tui verdict=drifted`,
+		}
+		m.vp = viewport.New(w, h-3)
+		m.vp.SetContent(m.activityContent())
+		out := m.activityView()
+		assertNoOverflow(t, "activity", out, w)
+		for _, want := range []string{"3 line(s)", "tool=chezmoi", "f follow: on"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("w=%d activity view missing %q", w, want)
+			}
+		}
+
+		m.filter.SetValue("ERRO")
+		body := m.activityContent()
+		if !strings.Contains(body, "1 of 3 line(s) shown") {
+			t.Errorf("w=%d filtered activity should count matches, got:\n%s", w, body)
+		}
+		if strings.Contains(body, "verdict=drifted") {
+			t.Errorf("w=%d filtered activity should hide non-matching lines", w)
+		}
+	}
+}
+
+// TestUpdatesPaneBinaryRow checks the outdated binary appears as a selectable
+// Updates item (counted in the chip) and its detail renders the cached release
+// notes with the self-update remedy — with no fetch when the cache is warm.
+func TestUpdatesPaneBinaryRow(t *testing.T) {
+	m := sampleModel(160, 40)
+	rows, items := m.updatesContent()
+	if len(items) == 0 || items[0].kind != kindRelease {
+		t.Fatalf("expected the binary-update row as the first Updates selectable, got %+v", items)
+	}
+	found := false
+	for _, r := range rows {
+		if strings.Contains(r.text, "myplace: v0.1.0 → v0.2.0") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Updates pane missing the binary row, rows: %+v", rows)
+	}
+	// binary (1) + node (1) + git/htop (2)
+	if got := m.cardCount(focusUpdates); got != 4 {
+		t.Errorf("Updates chip should count the binary row: want 4, got %d", got)
+	}
+
+	m.focus = focusUpdates
+	m.sel[focusUpdates] = 0
+	m.rel = &release.Release{
+		Tag: "v0.2.0", Name: "v0.2.0 — doctor view",
+		Notes:       "## Changes\r\n- doctor view in the TUI\r\n",
+		PublishedAt: time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC),
+		URL:         "https://github.com/mikevalstar/myplace/releases/tag/v0.2.0",
+	}
+	if cmd := m.syncDetail(); cmd != nil {
+		t.Error("warm release cache should not trigger a fetch")
+	}
+	out := m.View()
+	assertNoOverflow(t, "release-detail", out, 160)
+	for _, want := range []string{"current: v0.1.0", "latest:  v0.2.0", "myplace self-update", "doctor view in the TUI"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("release detail missing %q", want)
+		}
+	}
+
+	// Cold cache: the detail shows a loading line and returns the fetch cmd once.
+	mc := sampleModel(160, 40)
+	mc.focus = focusUpdates
+	mc.sel[focusUpdates] = 0
+	if cmd := mc.syncDetail(); cmd == nil {
+		t.Error("cold release cache should trigger the lazy fetch")
+	}
+	if !strings.Contains(mc.View(), "loading release notes") {
+		t.Error("cold release detail should show the loading line")
+	}
+	if cmd := mc.syncDetail(); cmd != nil {
+		t.Error("a pending fetch should not be issued twice")
+	}
+}
+
+// TestDoctorActivityNavigation drives the d/a mode transitions through Update.
+func TestDoctorActivityNavigation(t *testing.T) {
+	m := sampleModel(100, 30)
+
+	// d opens the doctor view and kicks off a run (the cmd is not executed here)
+	m = step(m, keyMsg("d"))
+	if m.mode != modeDoctor || !m.doctorLoading {
+		t.Fatalf("expected modeDoctor with checks in flight, got mode=%d loading=%v", m.mode, m.doctorLoading)
+	}
+	m = step(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.mode != modeDashboard {
+		t.Fatalf("expected modeDashboard after esc, got %d", m.mode)
+	}
+
+	// re-entering with a cached report must not re-run the checks
+	m.doctorLoading = false
+	m.doctorRep = sampleDoctorReport()
+	next, cmd := m.Update(keyMsg("d"))
+	m = next.(Model)
+	if cmd != nil {
+		t.Error("cached doctor report should not re-run on re-entry")
+	}
+	if !strings.Contains(m.View(), "problems found") {
+		t.Error("doctor view should render the cached report")
+	}
+	m = step(m, tea.KeyMsg{Type: tea.KeyEsc})
+
+	// the not-ready verdict now surfaces as an Activity-pane notice
+	noticed := false
+	for _, r := range m.activityRows() {
+		if strings.Contains(r.text, "doctor: problems found") {
+			noticed = true
+		}
+	}
+	if !noticed {
+		t.Error("dashboard Activity pane should carry the doctor notice")
+	}
+
+	// a opens the activity view following; f toggles follow off
+	m = step(m, keyMsg("a"))
+	if m.mode != modeActivity || !m.follow {
+		t.Fatalf("expected modeActivity following, got mode=%d follow=%v", m.mode, m.follow)
+	}
+	m = step(m, keyMsg("f"))
+	if m.follow {
+		t.Error("f should toggle follow off")
+	}
+	m = step(m, keyMsg("q"))
+	if m.mode != modeDashboard {
+		t.Fatalf("expected modeDashboard after q, got %d", m.mode)
+	}
+}
+
 // TestNavigation drives focus/selection/detail transitions through Update.
 func TestNavigation(t *testing.T) {
 	m := sampleModel(100, 30) // narrow → enter opens full-screen detail
@@ -285,5 +479,20 @@ func TestRenderSnapshot(t *testing.T) {
 		m.vp = viewport.New(100, 25)
 		m.vp.SetContent(m.outdatedContent())
 		fmt.Println(m.outdatedView())
+
+		d := sampleModel(100, 28)
+		d.mode = modeDoctor
+		d.doctorRep = sampleDoctorReport()
+		d.vp = viewport.New(100, 25)
+		d.vp.SetContent(d.doctorContent())
+		fmt.Println(d.doctorView())
+
+		a := sampleModel(100, 28)
+		a.mode = modeActivity
+		a.follow = true
+		a.actLines = a.activity
+		a.vp = viewport.New(100, 25)
+		a.vp.SetContent(a.activityContent())
+		fmt.Println(a.activityView())
 	}
 }

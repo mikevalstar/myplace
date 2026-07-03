@@ -9,7 +9,9 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/mikevalstar/myplace/internal/doctor"
 	"github.com/mikevalstar/myplace/internal/drift"
+	"github.com/mikevalstar/myplace/internal/logging"
 )
 
 // truncate clips s to w display columns, adding an ellipsis when cut. It is
@@ -75,12 +77,12 @@ func (m Model) dotfilesContent() ([]paneRow, []selectable) {
 	plain("behind origin:    " + count(d.BehindOrigin))
 	plain(fmt.Sprintf("to apply:         %d", len(d.ToApply)))
 	for _, f := range d.ToApply {
-		items = append(items, selectable{isDiff: true, path: f, title: "diff · " + f})
+		items = append(items, selectable{kind: kindDiff, path: f, title: "diff · " + f})
 		rows = append(rows, paneRow{text: "  ↓ " + f, style: th.Del, selIdx: len(items) - 1})
 	}
 	plain(fmt.Sprintf("modified locally: %d", len(d.LocalModified)))
 	for _, f := range d.LocalModified {
-		items = append(items, selectable{isDiff: true, path: f, title: "diff · " + f})
+		items = append(items, selectable{kind: kindDiff, path: f, title: "diff · " + f})
 		rows = append(rows, paneRow{text: "  ↑ " + f, style: th.Add, selIdx: len(items) - 1})
 	}
 	plain("uncommitted:      " + count(d.UncommittedFiles))
@@ -119,6 +121,13 @@ func (m Model) updatesContent() ([]paneRow, []selectable) {
 	th := m.theme
 	var rows []paneRow
 	var items []selectable
+	// The binary itself is an update too (drift.Myplace): listed first, from the
+	// already-loaded report, independent of the package inventory. Informational
+	// — the swap stays `myplace self-update` in the CLI.
+	if r := m.report; r != nil && r.Myplace.Latest != nil && *r.Myplace.Latest != r.Myplace.Current {
+		items = append(items, selectable{kind: kindRelease, title: fmt.Sprintf("myplace · v%s → v%s", r.Myplace.Current, *r.Myplace.Latest)})
+		rows = append(rows, paneRow{text: fmt.Sprintf("myplace: v%s → v%s", r.Myplace.Current, *r.Myplace.Latest), style: th.Notice, selIdx: len(items) - 1})
+	}
 	if m.invLoading || m.inventory == nil {
 		rows = append(rows, paneRow{text: "checking…", style: th.Subtle, selIdx: -1})
 		return rows, items
@@ -214,12 +223,14 @@ func (m Model) cardCount(f focus) int {
 	case focusTools:
 		return len(m.report.Tools.Missing) + len(m.report.Tools.Outdated)
 	case focusUpdates:
-		if m.inventory == nil {
-			return 0
-		}
 		n := 0
-		for _, s := range m.inventory.Sources {
-			n += len(s.Packages)
+		if m.report.Myplace.Latest != nil && *m.report.Myplace.Latest != m.report.Myplace.Current {
+			n++ // the binary-update row
+		}
+		if m.inventory != nil {
+			for _, s := range m.inventory.Sources {
+				n += len(s.Packages)
+			}
 		}
 		return n
 	}
@@ -302,6 +313,15 @@ func (m Model) activityRows() []paneRow {
 	if r != nil && r.Myplace.Latest != nil && *r.Myplace.Latest != r.Myplace.Current {
 		rows = append(rows, paneRow{text: fmt.Sprintf("myplace %s → %s available (myplace self-update)", r.Myplace.Current, *r.Myplace.Latest), style: th.Notice, selIdx: -1})
 	}
+	// Once the on-demand doctor report exists, keep a not-ready verdict visible
+	// from the dashboard.
+	if m.doctorRep != nil && m.doctorRep.Verdict != doctor.VerdictPass {
+		style := th.Notice
+		if m.doctorRep.Verdict == doctor.VerdictFail {
+			style = th.Err
+		}
+		rows = append(rows, paneRow{text: "doctor: " + doctorVerdictText(m.doctorRep) + " — press d", style: style, selIdx: -1})
+	}
 	for _, e := range m.updateErrs {
 		rows = append(rows, paneRow{text: "! " + e, style: th.Err, selIdx: -1})
 	}
@@ -360,6 +380,55 @@ func (m Model) renderDetailBody(it selectable) string {
 	}
 	var b strings.Builder
 	for _, ln := range it.body {
+		b.WriteString(truncate(ln, cw) + "\n")
+	}
+	return b.String()
+}
+
+// renderReleaseDetail is the binary-update row's detail: the version delta from
+// the already-loaded report, plus the latest release's notes once the lazy
+// GitHub fetch lands (loading/error states render in place; nothing blocks).
+func (m Model) renderReleaseDetail() string {
+	th := m.theme
+	cw := m.detailVP.Width
+	if cw <= 0 {
+		cw = m.width
+	}
+	my := m.report.Myplace
+	latest := ""
+	if my.Latest != nil {
+		latest = *my.Latest
+	}
+	lines := []string{
+		"myplace",
+		"",
+		"current: v" + my.Current,
+		"latest:  v" + latest,
+		"",
+		th.Notice.Render("run: myplace self-update"),
+		"",
+	}
+	switch {
+	case m.relErr != "":
+		lines = append(lines, th.Err.Render("! release notes unavailable: "+m.relErr))
+	case m.rel == nil:
+		lines = append(lines, th.Subtle.Render("loading release notes…"))
+	default:
+		if m.rel.Name != "" {
+			lines = append(lines, th.PaneTitle.Render(m.rel.Name))
+		}
+		if !m.rel.PublishedAt.IsZero() {
+			lines = append(lines, th.Subtle.Render("published "+m.rel.PublishedAt.Local().Format("2006-01-02")))
+		}
+		if m.rel.URL != "" {
+			lines = append(lines, th.Subtle.Render(m.rel.URL))
+		}
+		lines = append(lines, "")
+		notes := strings.ReplaceAll(strings.TrimRight(m.rel.Notes, "\n"), "\r", "")
+		lines = append(lines, strings.Split(notes, "\n")...)
+	}
+	var b strings.Builder
+	for _, ln := range lines {
 		b.WriteString(truncate(ln, cw) + "\n")
 	}
 	return b.String()
@@ -428,6 +497,10 @@ func (m Model) View() string {
 	switch m.mode {
 	case modeOutdated:
 		return m.outdatedView()
+	case modeDoctor:
+		return m.doctorView()
+	case modeActivity:
+		return m.activityView()
 	case modeDetail:
 		return m.detailView()
 	}
@@ -774,4 +847,140 @@ func (m Model) outdatedContent() string {
 		tbl.Row(r.name, r.cur, "→ "+r.lat, r.src)
 	}
 	return head + "\n\n" + tbl.Render()
+}
+
+// --- doctor view ------------------------------------------------------------
+
+func (m Model) doctorView() string {
+	th := m.theme
+	title := th.Header.Render("myplace "+m.version) + th.Subtle.Render("  doctor — preflight checks")
+	header := truncate(title, m.width) + "\n" + th.Rule.Render(strings.Repeat("─", m.width))
+	footer := th.Help.Render("↑/↓ scroll • r re-run • esc back • q quit")
+	body := m.vp.View()
+	// While the checks run, center a live spinner instead of the viewport so it
+	// animates (the viewport body is only rebuilt on messages).
+	if m.doctorLoading {
+		body = lipgloss.Place(m.width, max1(m.height-3), lipgloss.Center, lipgloss.Center,
+			m.spinner.View()+"  running doctor checks…")
+	}
+	return strings.Join([]string{header, body, footer}, "\n")
+}
+
+// doctorContent renders the cached preflight report: the CLI's verdict line,
+// then one glyph + label + detail line per check, with the remedy indented
+// beneath anything not passing. Same content as `myplace doctor`, themed.
+func (m Model) doctorContent() string {
+	th := m.theme
+	if m.doctorRep == nil {
+		return th.Subtle.Render("press r to run the checks")
+	}
+	cw := m.vp.Width
+	if cw <= 0 {
+		cw = m.width
+	}
+	rep := m.doctorRep
+	verdictStyle := th.Add
+	switch rep.Verdict {
+	case doctor.VerdictFail:
+		verdictStyle = th.Err
+	case doctor.VerdictIncomplete:
+		verdictStyle = th.Notice
+	}
+	var b strings.Builder
+	b.WriteString(truncate(verdictStyle.Bold(true).Render(doctorVerdictText(rep)), cw) + "\n")
+	b.WriteString(truncate(th.Subtle.Render("checked "+rep.CheckedAt.Local().Format("15:04:05")), cw) + "\n\n")
+	for _, c := range rep.Checks {
+		var glyph string
+		var style lipgloss.Style
+		switch c.Status {
+		case doctor.StatusPass:
+			glyph, style = "✓", th.Add
+		case doctor.StatusWarn:
+			glyph, style = "⚠", th.Notice
+		default:
+			glyph, style = "✗", th.Err
+		}
+		line := strings.TrimRight(fmt.Sprintf("%s %-22s %s", glyph, c.Label, c.Detail), " ")
+		b.WriteString(truncate(style.Render(line), cw) + "\n")
+		if c.Remedy != "" {
+			b.WriteString(truncate(th.Notice.Render("    → "+c.Remedy), cw) + "\n")
+		}
+	}
+	return b.String()
+}
+
+// doctorVerdictText matches the CLI's verdict wording (cmd/myplace/doctor.go).
+func doctorVerdictText(r *doctor.Report) string {
+	var fails, warns int
+	for _, c := range r.Checks {
+		switch c.Status {
+		case doctor.StatusFail:
+			fails++
+		case doctor.StatusWarn:
+			warns++
+		}
+	}
+	switch r.Verdict {
+	case doctor.VerdictPass:
+		return "ready — all checks passed"
+	case doctor.VerdictIncomplete:
+		return fmt.Sprintf("incomplete — %d warning(s); some checks could not complete (offline?)", warns)
+	default:
+		return fmt.Sprintf("problems found — %d failed, %d warning(s)", fails, warns)
+	}
+}
+
+// --- activity view ----------------------------------------------------------
+
+func (m Model) activityView() string {
+	th := m.theme
+	title := th.Header.Render("myplace "+m.version) + th.Subtle.Render("  activity — "+logging.Path())
+	header := truncate(title, m.width) + "\n" + th.Rule.Render(strings.Repeat("─", m.width))
+	var footer string
+	if m.filtering {
+		footer = truncate(m.filter.View(), m.width)
+	} else {
+		follow := "off"
+		if m.follow {
+			follow = "on"
+		}
+		footer = th.Help.Render("↑/↓ scroll • / filter • f follow: " + follow + " • esc back • q quit")
+	}
+	return strings.Join([]string{header, m.vp.View(), footer}, "\n")
+}
+
+// activityContent is the scrollable body of the modeActivity view: the deep
+// log tail, narrowed by the case-insensitive substring filter, with warn/error
+// lines emphasized.
+func (m Model) activityContent() string {
+	th := m.theme
+	cw := m.vp.Width
+	if cw <= 0 {
+		cw = m.width
+	}
+	if len(m.actLines) == 0 {
+		return th.Subtle.Render("(log empty or unreadable)")
+	}
+	filter := strings.ToLower(strings.TrimSpace(m.filter.Value()))
+	var b strings.Builder
+	shown := 0
+	for _, ln := range m.actLines {
+		if filter != "" && !strings.Contains(strings.ToLower(ln), filter) {
+			continue
+		}
+		shown++
+		style := th.Subtle
+		switch {
+		case strings.Contains(ln, " ERRO"):
+			style = th.Err
+		case strings.Contains(ln, " WARN"):
+			style = th.Notice
+		}
+		b.WriteString(truncate(style.Render(ln), cw) + "\n")
+	}
+	head := fmt.Sprintf("%d line(s)", len(m.actLines))
+	if filter != "" {
+		head = fmt.Sprintf("%d of %d line(s) shown", shown, len(m.actLines))
+	}
+	return truncate(th.PaneTitle.Render(head), cw) + "\n\n" + b.String()
 }

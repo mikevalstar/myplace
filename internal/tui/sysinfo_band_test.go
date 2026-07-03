@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mikevalstar/myplace/internal/doctor"
 	"github.com/mikevalstar/myplace/internal/sysinfo"
 )
 
@@ -44,7 +45,7 @@ func TestSysinfoBandLinesContent(t *testing.T) {
 }
 
 func TestSysinfoBandFixedHeight(t *testing.T) {
-	m := New(nil, nil, nil, nil, "0.1.0")
+	m := New(nil, nil, nil, nil, "0.1.0", doctor.Options{})
 	// Loading (system nil, no error), error, and populated must all render
 	// exactly sysinfoBandLines rows so the layout never shifts.
 	for _, tc := range []struct {

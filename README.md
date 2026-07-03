@@ -49,7 +49,7 @@ Details and failure handling: [bootstrap workflow](docs/workflows/bootstrap-new-
 ## Everyday use
 
 ```sh
-myplace              # TUI dashboard: drift in both directions, r refresh / u update / o outdated / q quit
+myplace              # TUI dashboard: drift in both directions, r refresh / u update / o outdated / d doctor / a activity log / q quit
 myplace update       # capture local edits (keep/discard/skip per file), pull + apply, upgrade tools
 myplace status       # quick plain-text summary, no TUI
 myplace doctor       # preflight: can this machine run myplace? names a remedy for anything wrong

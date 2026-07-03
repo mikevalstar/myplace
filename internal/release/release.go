@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 const Repo = "mikevalstar/myplace"
@@ -27,41 +28,69 @@ const Repo = "mikevalstar/myplace"
 // ldflags-stamped version.
 func NormalizeTag(tag string) string { return strings.TrimPrefix(tag, "v") }
 
-// ParseLatestTag extracts tag_name from a GitHub releases/latest response.
-func ParseLatestTag(body []byte) (string, error) {
-	var resp struct {
-		TagName string `json:"tag_name"`
-	}
-	if err := json.Unmarshal(body, &resp); err != nil {
-		return "", err
-	}
-	if resp.TagName == "" {
-		return "", errors.New("no tag_name in release response")
-	}
-	return resp.TagName, nil
+// Release is the subset of a GitHub release the dashboard's binary-update
+// detail shows: the tag plus the human-facing notes.
+type Release struct {
+	Tag         string    `json:"tag_name"`
+	Name        string    `json:"name"`
+	Notes       string    `json:"body"`
+	PublishedAt time.Time `json:"published_at"`
+	URL         string    `json:"html_url"`
 }
 
-// LatestTag queries the GitHub API for the newest release tag (e.g. "v0.1.0").
-func LatestTag(ctx context.Context) (string, error) {
+// ParseLatest extracts the release fields from a GitHub releases/latest
+// response.
+func ParseLatest(body []byte) (Release, error) {
+	var rel Release
+	if err := json.Unmarshal(body, &rel); err != nil {
+		return Release{}, err
+	}
+	if rel.Tag == "" {
+		return Release{}, errors.New("no tag_name in release response")
+	}
+	return rel, nil
+}
+
+// ParseLatestTag extracts tag_name from a GitHub releases/latest response.
+func ParseLatestTag(body []byte) (string, error) {
+	rel, err := ParseLatest(body)
+	if err != nil {
+		return "", err
+	}
+	return rel.Tag, nil
+}
+
+// Latest queries the GitHub API for the newest release's metadata (tag, notes,
+// publish date).
+func Latest(ctx context.Context) (Release, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", Repo)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return "", err
+		return Release{}, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return Release{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("releases/latest: HTTP %d", resp.StatusCode)
+		return Release{}, fmt.Errorf("releases/latest: HTTP %d", resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
+		return Release{}, err
+	}
+	return ParseLatest(body)
+}
+
+// LatestTag queries the GitHub API for the newest release tag (e.g. "v0.1.0").
+func LatestTag(ctx context.Context) (string, error) {
+	rel, err := Latest(ctx)
+	if err != nil {
 		return "", err
 	}
-	return ParseLatestTag(body)
+	return rel.Tag, nil
 }
 
 // ArchiveName is the version-less archive filename for this platform — also the

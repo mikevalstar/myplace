@@ -81,16 +81,20 @@ func New(command string) (*log.Logger, func()) {
 }
 
 // RecentLines returns up to the last n lines of the log file (for the TUI
-// Activity pane). It reads only a tail window of the file, so it's cheap to
-// call on a timer. Returns nil if the log can't be read.
-func RecentLines(n int) []string {
+// Activity pane). It reads only a small tail window of the file, so it's cheap
+// to call on a timer. Returns nil if the log can't be read.
+func RecentLines(n int) []string { return TailLines(n, 32<<10) }
+
+// TailLines returns up to the last n lines read from at most window trailing
+// bytes of the log file (for the TUI activity view, which wants a much deeper
+// tail than the pane). Returns nil if the log can't be read.
+func TailLines(n int, window int64) []string {
 	f, err := os.Open(Path())
 	if err != nil {
 		return nil
 	}
 	defer f.Close()
 
-	const window = 32 << 10
 	var start int64
 	if fi, err := f.Stat(); err == nil && fi.Size() > window {
 		start = fi.Size() - window

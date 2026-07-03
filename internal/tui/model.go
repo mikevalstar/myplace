@@ -23,9 +23,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/mikevalstar/myplace/internal/chezmoi"
+	"github.com/mikevalstar/myplace/internal/doctor"
 	"github.com/mikevalstar/myplace/internal/drift"
 	"github.com/mikevalstar/myplace/internal/mise"
 	"github.com/mikevalstar/myplace/internal/outdated"
+	"github.com/mikevalstar/myplace/internal/release"
 	"github.com/mikevalstar/myplace/internal/sysinfo"
 )
 
@@ -45,6 +47,8 @@ const (
 	modeDashboard mode = iota // the paneled home screen
 	modeOutdated              // the scrollable outdated-packages detail view
 	modeDetail                // full-screen detail (narrow terminals; `enter`)
+	modeDoctor                // the scrollable doctor-preflight view
+	modeActivity              // the scrollable full-log activity view
 )
 
 // focus is which pane the keyboard is driving on the dashboard.
@@ -76,8 +80,21 @@ const (
 	stepDone
 )
 
+// How deep the modeActivity view reads into the log: far deeper than the
+// pane's 200-line tail — with ~5 MB rotation, 1 MB is the whole recent file in
+// practice — but still a bounded window so the 1-second tick stays cheap.
+const (
+	activityTailLines  = 5000
+	activityTailWindow = 1 << 20
+)
+
 type reportMsg struct{ report drift.Report }
 type inventoryMsg struct{ inv outdated.Inventory }
+type doctorMsg struct{ report doctor.Report }
+type releaseMsg struct {
+	rel release.Release
+	err error
+}
 type sysinfoMsg struct {
 	info *sysinfo.Info
 	err  error
@@ -96,14 +113,24 @@ type stepDoneMsg struct {
 	skipped bool
 }
 
+// selKind is what a selectable's detail shows: pre-rendered lines from
+// already-loaded data, a lazily fetched chezmoi diff, or the latest GitHub
+// release's notes (the binary-update row). Diff and release detail are both
+// fetched once on first selection and cached; everything stays read-only.
+type selKind int
+
+const (
+	kindStatic selKind = iota
+	kindDiff
+	kindRelease
+)
+
 // selectable is one navigable item in a pane and the detail it shows.
-// A dotfile's detail is its (lazily fetched, cached) chezmoi diff; everything
-// else carries pre-rendered body lines from already-loaded data.
 type selectable struct {
-	isDiff bool     // dotfile → show chezmoi diff
-	path   string   // dotfile relative path (isDiff)
-	title  string   // detail-panel title
-	body   []string // static detail lines (!isDiff)
+	kind  selKind
+	path  string   // dotfile relative path (kindDiff)
+	title string   // detail-panel title
+	body  []string // static detail lines (kindStatic)
 }
 
 // paneRow is one display line in a pane. selIdx ≥ 0 marks it as the Nth
@@ -121,6 +148,7 @@ type Model struct {
 	si      *sysinfo.Client
 	sources []outdated.Source
 	version string
+	docOpts doctor.Options
 
 	theme Theme
 	keys  keyMap
@@ -147,6 +175,21 @@ type Model struct {
 	diffCache   map[string]string
 	diffPending map[string]bool
 
+	// latest-release detail for the binary-update row: fetched once on first
+	// selection, then cached (same pattern as diffs)
+	rel        *release.Release
+	relErr     string
+	relPending bool
+
+	// doctor preflight: run on demand (first `d`), cached for the session
+	doctorRep     *doctor.Report
+	doctorLoading bool
+
+	// activity view: the deep log tail and whether the viewport is pinned to
+	// the newest lines on each tick
+	actLines []string
+	follow   bool
+
 	// help overlay
 	showHelp bool
 
@@ -165,13 +208,13 @@ type Model struct {
 	activity []string
 }
 
-func New(ch *chezmoi.Client, ms *mise.Client, si *sysinfo.Client, sources []outdated.Source, version string) Model {
+func New(ch *chezmoi.Client, ms *mise.Client, si *sysinfo.Client, sources []outdated.Source, version string, docOpts doctor.Options) Model {
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
 	fi := textinput.New()
 	fi.Prompt = "filter: "
 	fi.CharLimit = 64
 	return Model{
-		ch: ch, ms: ms, si: si, sources: sources, version: version,
+		ch: ch, ms: ms, si: si, sources: sources, version: version, docOpts: docOpts,
 		theme:       DefaultTheme(),
 		keys:        newKeyMap(),
 		help:        help.New(),
@@ -189,8 +232,10 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, m.loadCmd(), m.loadInventoryCmd(), m.loadSysinfoCmd(), activityTick())
 }
 
-// Run starts the dashboard.
-func Run(ch *chezmoi.Client, ms *mise.Client, si *sysinfo.Client, sources []outdated.Source, version string) error {
-	_, err := tea.NewProgram(New(ch, ms, si, sources, version), tea.WithAltScreen()).Run()
+// Run starts the dashboard. docOpts carries the environment facts the doctor
+// view needs (the user's real PATH); the cmd layer resolves them, as it does
+// for the doctor CLI command.
+func Run(ch *chezmoi.Client, ms *mise.Client, si *sysinfo.Client, sources []outdated.Source, version string, docOpts doctor.Options) error {
+	_, err := tea.NewProgram(New(ch, ms, si, sources, version, docOpts), tea.WithAltScreen()).Run()
 	return err
 }

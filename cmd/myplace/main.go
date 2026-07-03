@@ -11,6 +11,7 @@ import (
 
 	"github.com/mikevalstar/myplace/internal/brew"
 	"github.com/mikevalstar/myplace/internal/chezmoi"
+	"github.com/mikevalstar/myplace/internal/doctor"
 	"github.com/mikevalstar/myplace/internal/drift"
 	"github.com/mikevalstar/myplace/internal/logging"
 	"github.com/mikevalstar/myplace/internal/mise"
@@ -119,7 +120,11 @@ func newRootCmd(r run.Runner, ch *chezmoi.Client, ms *mise.Client) *cobra.Comman
 				fmt.Print(renderStatusText(rep))
 				os.Exit(drift.ExitCode(rep.Verdict))
 			}
-			return tui.Run(ch, ms, sysinfo.New(r), sources, version.Version)
+			// The dashboard's `d` view runs the same preflight as `myplace
+			// doctor`; hand it the same environment facts. StdoutTTY is true by
+			// construction here — the interactive() check above just passed.
+			return tui.Run(ch, ms, sysinfo.New(r), sources, version.Version,
+				doctor.Options{PATH: userPATH(), StdoutTTY: true})
 		},
 	}
 

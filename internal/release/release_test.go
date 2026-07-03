@@ -1,6 +1,9 @@
 package release
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseLatestTag(t *testing.T) {
 	tag, err := ParseLatestTag([]byte(`{"tag_name": "v0.2.0", "name": "v0.2.0", "assets": []}`))
@@ -8,6 +11,22 @@ func TestParseLatestTag(t *testing.T) {
 		t.Errorf("want v0.2.0, got %q (err %v)", tag, err)
 	}
 	if _, err := ParseLatestTag([]byte(`{"message": "Not Found"}`)); err == nil {
+		t.Error("want error for response without tag_name")
+	}
+}
+
+func TestParseLatest(t *testing.T) {
+	rel, err := ParseLatest([]byte(`{"tag_name": "v0.2.0", "name": "v0.2.0 — doctor", "body": "## Changes\n- doctor view", "html_url": "https://github.com/mikevalstar/myplace/releases/tag/v0.2.0", "published_at": "2026-06-16T12:00:00Z"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rel.Tag != "v0.2.0" || rel.Name != "v0.2.0 — doctor" || !strings.Contains(rel.Notes, "doctor view") {
+		t.Errorf("unexpected release: %+v", rel)
+	}
+	if rel.PublishedAt.IsZero() || rel.URL == "" {
+		t.Errorf("published_at/html_url should parse: %+v", rel)
+	}
+	if _, err := ParseLatest([]byte(`{"message": "Not Found"}`)); err == nil {
 		t.Error("want error for response without tag_name")
 	}
 }

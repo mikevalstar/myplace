@@ -10,9 +10,11 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/mikevalstar/myplace/internal/doctor"
 	"github.com/mikevalstar/myplace/internal/drift"
 	"github.com/mikevalstar/myplace/internal/logging"
 	"github.com/mikevalstar/myplace/internal/outdated"
+	"github.com/mikevalstar/myplace/internal/release"
 )
 
 // --- commands -------------------------------------------------------------
@@ -60,6 +62,30 @@ func (m Model) diffCmd(relPath string) tea.Cmd {
 		defer cancel()
 		out, derr := m.ch.Diff(ctx, filepath.Join(home, relPath))
 		return diffMsg{path: relPath, diff: out, err: derr}
+	}
+}
+
+// doctorCmd runs the read-only preflight (the same checks as `myplace doctor`;
+// see docs/features/doctor-preflight-diagnostics.md). It runs on demand — first
+// `d`, or `r` inside the doctor view — never at dashboard startup, since two of
+// the checks probe the network.
+func (m Model) doctorCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		return doctorMsg{doctor.Run(ctx, m.ch, m.ms, m.docOpts)}
+	}
+}
+
+// releaseCmd fetches the latest release's metadata (notes, publish date) for
+// the binary-update detail — a read-only GitHub API call, fetched lazily on
+// first selection and cached like dotfile diffs.
+func (m Model) releaseCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		rel, err := release.Latest(ctx)
+		return releaseMsg{rel: rel, err: err}
 	}
 }
 
@@ -111,9 +137,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.help.Width = m.width
-		if m.mode == modeOutdated {
+		if m.mode == modeOutdated || m.mode == modeDoctor || m.mode == modeActivity {
 			m.vp.Width, m.vp.Height = m.width, m.height-3
-			m.vp.SetContent(m.outdatedContent())
+			m.setViewBody()
 		}
 		m.sizeDetail()
 		cmd := m.syncDetail()
@@ -121,6 +147,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case activityTickMsg:
 		m.activity = logging.RecentLines(200)
+		if m.mode == modeActivity {
+			m.actLines = logging.TailLines(activityTailLines, activityTailWindow)
+			m.vp.SetContent(m.activityContent())
+			if m.follow {
+				m.vp.GotoBottom()
+			}
+		}
 		return m, activityTick()
 
 	case reportMsg:
@@ -161,6 +194,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.diffCache[msg.path] = msg.diff
 		}
 		// If this diff is for the current selection, show it now.
+		return m, m.syncDetail()
+
+	case doctorMsg:
+		m.doctorRep = &msg.report
+		m.doctorLoading = false
+		if m.mode == modeDoctor {
+			m.vp.SetContent(m.doctorContent())
+		}
+		return m, nil
+
+	case releaseMsg:
+		m.relPending = false
+		if msg.err != nil {
+			m.relErr = msg.err.Error()
+		} else {
+			m.rel = &msg.rel
+			m.relErr = ""
+		}
 		return m, m.syncDetail()
 
 	case stepDoneMsg:
@@ -220,8 +271,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	// While typing a filter, keystrokes belong to the text input (except the
-	// keys that end filtering, handled in updateOutdated).
+	// keys that end filtering, handled by the owning view).
 	if m.filtering {
+		if m.mode == modeActivity {
+			return m.updateActivity(msg)
+		}
 		return m.updateOutdated(msg)
 	}
 	// Help overlay: `?` toggles; while open it swallows everything but esc/?.
@@ -238,6 +292,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.mode {
 	case modeOutdated:
 		return m.updateOutdated(msg)
+	case modeDoctor:
+		return m.updateDoctor(msg)
+	case modeActivity:
+		return m.updateActivity(msg)
 	case modeDetail:
 		return m.updateDetailMode(msg)
 	default:
@@ -251,8 +309,24 @@ func (m Model) updateDashboard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case key.Matches(msg, m.keys.Outdated):
 		m.mode = modeOutdated
+		m.filter.SetValue("")
 		m.vp = viewport.New(m.width, m.height-3)
 		m.vp.SetContent(m.outdatedContent())
+		return m, nil
+	case key.Matches(msg, m.keys.Doctor):
+		m.mode = modeDoctor
+		m.vp = viewport.New(m.width, m.height-3)
+		cmd := m.startDoctor(false)
+		m.vp.SetContent(m.doctorContent())
+		return m, cmd
+	case key.Matches(msg, m.keys.Activity):
+		m.mode = modeActivity
+		m.follow = true
+		m.filter.SetValue("")
+		m.actLines = logging.TailLines(activityTailLines, activityTailWindow)
+		m.vp = viewport.New(m.width, m.height-3)
+		m.vp.SetContent(m.activityContent())
+		m.vp.GotoBottom()
 		return m, nil
 	case key.Matches(msg, m.keys.Refresh):
 		if !m.loading && !m.updating {
@@ -346,6 +420,90 @@ func (m Model) updateOutdated(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// startDoctor kicks off the preflight when there's no cached report (or when
+// re-running from the view). No-op while a run is already in flight.
+func (m *Model) startDoctor(rerun bool) tea.Cmd {
+	if m.doctorLoading || (m.doctorRep != nil && !rerun) {
+		return nil
+	}
+	m.doctorLoading = true
+	return tea.Batch(m.spinner.Tick, m.doctorCmd())
+}
+
+func (m Model) updateDoctor(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Esc), key.Matches(msg, m.keys.Quit):
+		m.mode = modeDashboard
+		return m, nil
+	case key.Matches(msg, m.keys.Refresh):
+		cmd := m.startDoctor(true)
+		m.vp.SetContent(m.doctorContent())
+		return m, cmd
+	}
+	var cmd tea.Cmd
+	m.vp, cmd = m.vp.Update(msg)
+	return m, cmd
+}
+
+func (m Model) updateActivity(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.filtering {
+		switch {
+		case key.Matches(msg, m.keys.Esc):
+			m.filtering = false
+			m.filter.SetValue("")
+			m.filter.Blur()
+			m.refreshActivityBody()
+			return m, nil
+		case msg.String() == "enter":
+			m.filtering = false
+			m.filter.Blur()
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.filter, cmd = m.filter.Update(msg)
+		m.refreshActivityBody()
+		return m, cmd
+	}
+	switch {
+	case key.Matches(msg, m.keys.Esc), key.Matches(msg, m.keys.Quit):
+		m.mode = modeDashboard
+		return m, nil
+	case key.Matches(msg, m.keys.Filter):
+		m.filtering = true
+		m.filter.Focus()
+		return m, nil
+	case key.Matches(msg, m.keys.Follow):
+		m.follow = !m.follow
+		if m.follow {
+			m.vp.GotoBottom()
+		}
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.vp, cmd = m.vp.Update(msg)
+	return m, cmd
+}
+
+func (m *Model) refreshActivityBody() {
+	m.vp.SetContent(m.activityContent())
+	if m.follow {
+		m.vp.GotoBottom()
+	}
+}
+
+// setViewBody rebuilds the shared full-screen viewport's content for whichever
+// scrollable view is showing (called on resize).
+func (m *Model) setViewBody() {
+	switch m.mode {
+	case modeOutdated:
+		m.vp.SetContent(m.outdatedContent())
+	case modeDoctor:
+		m.vp.SetContent(m.doctorContent())
+	case modeActivity:
+		m.refreshActivityBody()
+	}
+}
+
 // --- navigation helpers ---------------------------------------------------
 
 func (m Model) wide() bool { return m.width >= wideThreshold }
@@ -430,7 +588,8 @@ func (m *Model) syncDetail() tea.Cmd {
 		m.sel[m.focus] = len(items) - 1
 	}
 	it := items[m.sel[m.focus]]
-	if it.isDiff {
+	switch it.kind {
+	case kindDiff:
 		if d, ok := m.diffCache[it.path]; ok {
 			m.detailVP.SetContent(m.renderDiff(d))
 			return nil
@@ -439,6 +598,13 @@ func (m *Model) syncDetail() tea.Cmd {
 		if m.ch != nil && !m.diffPending[it.path] {
 			m.diffPending[it.path] = true
 			return m.diffCmd(it.path)
+		}
+		return nil
+	case kindRelease:
+		m.detailVP.SetContent(m.renderReleaseDetail())
+		if m.rel == nil && m.relErr == "" && !m.relPending {
+			m.relPending = true
+			return m.releaseCmd()
 		}
 		return nil
 	}

@@ -2,7 +2,7 @@
 title: Preflight diagnostics (myplace doctor)
 status: active
 created: 2026-06-13
-updated: 2026-06-16
+updated: 2026-07-03
 tags: [cli, diagnostics, troubleshooting, headless]
 phase: 1
 ---
@@ -37,6 +37,8 @@ It also gives the headless story a clean preflight: a provisioning script can ru
 ## Behavior
 
 `myplace doctor` runs every check, prints a section per check with a status glyph, and ends with an overall verdict. It never prompts and never writes, so it is safe to run anywhere, including non-interactively.
+
+The TUI dashboard renders the same report full-screen via `d` — checks run on demand there (not at dashboard startup, since two probe the network), the report is cached for the session, and `r` re-runs it; see [TUI dashboard layout](tui-dashboard.md). The CLI remains the headless contract.
 
 ### Checks
 
