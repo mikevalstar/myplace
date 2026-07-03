@@ -102,42 +102,37 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 			}
 
 			if doDotfiles {
-				// Applying aborts on a managed file that has uncaptured local
-				// edits — apply would overwrite it, so chezmoi prompts, and
-				// with no TTY that prompt fails. Detect that up front and
-				// report it plainly instead of letting it surface as a cryptic
-				// "EOF". Capturing (keep/discard) is the resolution; in
-				// headless runs it must be done interactively.
-				if mods := localModified(ctx, ch); len(mods) > 0 {
-					var hint string
-					if yes {
-						hint = "run `myplace update` (interactive) to keep or discard them"
-					} else {
-						hint = "re-run and choose keep or discard instead of skip"
-					}
-					msg := fmt.Sprintf("not applied — local edits to %s; %s", strings.Join(mods, ", "), hint)
-					logger.Error("update dotfiles skipped (local edits)", "files", strings.Join(mods, ","))
-					if !jsonOut {
-						fmt.Fprintf(os.Stderr, "%-16s SKIPPED: %s\n", "chezmoi apply", msg)
-					}
-					steps = append(steps, stepResult{Name: "chezmoi apply", OK: false, Error: msg})
-				} else {
-					// Re-init between pull and apply so a config-template change
-					// that just arrived (e.g. the [age] section, ADR-0022) is in
-					// the machine-local chezmoi.toml before apply needs it.
-					// prompt*Once values carry over — this never asks again.
-					if step("chezmoi pull", func() error { return ch.Pull(ctx) }) &&
-						step("chezmoi init", func() error { return ch.InitConfig(ctx) }) {
-						step("chezmoi apply", func() error {
-							if mods := localModified(ctx, ch); len(mods) > 0 {
-								return fmt.Errorf("not applied — local edits to %s; run `myplace update` (interactive) to keep or discard them", strings.Join(mods, ", "))
-							}
+				// Pull + re-init always run, even when local edits will block
+				// the apply — they only touch the source clone, never $HOME,
+				// so the machine keeps tracking origin (config-template
+				// changes included) instead of silently falling behind.
+				// Re-init between pull and apply so a config-template change
+				// that just arrived (e.g. the [age] section, ADR-0022) is in
+				// the machine-local chezmoi.toml before apply needs it.
+				// prompt*Once values carry over — this never asks again.
+				if step("chezmoi pull", func() error { return ch.Pull(ctx) }) &&
+					step("chezmoi init", func() error { return ch.InitConfig(ctx) }) {
+					step("chezmoi apply", func() error {
+						// Applying aborts on a managed file that has
+						// uncaptured local edits — apply would overwrite it,
+						// so chezmoi prompts, and with no TTY that prompt
+						// fails. Detect that up front and report it plainly
+						// instead of letting it surface as a cryptic "EOF".
+						// Capturing (keep/discard) is the resolution; it
+						// needs an interactive run.
+						if mods := localModified(ctx, ch); len(mods) > 0 {
+							hint := "re-run and choose keep or discard instead of skip"
 							if yes {
-								return ch.Apply(ctx)
+								hint = "run `myplace update` (interactive) to keep or discard them"
 							}
-							return reviewAndApplyIncoming(ctx, ch)
-						})
-					}
+							logger.Error("update apply skipped (local edits)", "files", strings.Join(mods, ","))
+							return fmt.Errorf("not applied — local edits to %s; %s", strings.Join(mods, ", "), hint)
+						}
+						if yes {
+							return ch.Apply(ctx)
+						}
+						return reviewAndApplyIncoming(ctx, ch)
+					})
 				}
 			}
 			if doTools {

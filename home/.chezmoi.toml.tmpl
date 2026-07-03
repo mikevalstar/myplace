@@ -8,7 +8,7 @@
 {{- $gitEmail := promptStringOnce . "gitEmail" "gitEmail" "mike@valstar.dev" -}}
 
 {{/* age encryption for secret-bearing dotfiles (ADR-0022). The identity is a
-     per-fleet key fetched once from 1Password by run_once_before_fetch-age-key;
+     per-fleet key fetched once from 1Password by run_before_fetch-age-key;
      the recipient is its public half (not secret). Configured on every profile —
      servers never decrypt anything (.chezmoiignore takes the encrypted targets
      out of scope there), so a missing key file is harmless on them. */}}

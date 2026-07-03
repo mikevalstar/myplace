@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -11,6 +13,11 @@ import (
 	"github.com/mikevalstar/myplace/internal/release"
 	"github.com/mikevalstar/myplace/internal/version"
 )
+
+// selfUpdateTimeout bounds the whole self-update (release lookup + archive +
+// checksums downloads) so a blackholed connection can't hang the command
+// forever (ADR-0006). Generous: the archive is a few MB, but slow links exist.
+const selfUpdateTimeout = 10 * time.Minute
 
 func newVersionCmd() *cobra.Command {
 	var jsonOut bool
@@ -48,7 +55,9 @@ func newSelfUpdateCmd() *cobra.Command {
 			annNote:         "replaces this binary in place from the latest GitHub release and runs unattended (no prompt). --json reports {updated: bool, version}.",
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			tag, err := release.SelfUpdate(cmd.Context(), version.Version)
+			ctx, cancel := context.WithTimeout(cmd.Context(), selfUpdateTimeout)
+			defer cancel()
+			tag, err := release.SelfUpdate(ctx, version.Version)
 			switch {
 			case errors.Is(err, release.ErrUpToDate):
 				if jsonOut {

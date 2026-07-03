@@ -565,6 +565,10 @@ func (m Model) progressBlock(innerW int) string {
 		var marker string
 		var style lipgloss.Style
 		switch {
+		case m.stepOutcomes[st.s] == outcomeFailed:
+			marker, style = "✗", th.Err
+		case m.stepOutcomes[st.s] == outcomeSkipped:
+			marker, style = "↷", th.Notice
 		case m.updateStep > st.s:
 			marker, style = "✓", th.Add
 		case m.updateStep == st.s:
@@ -584,6 +588,9 @@ func (m Model) progressBlock(innerW int) string {
 	p := m.progress
 	p.Width = innerW
 	lines = append(lines, "", p.ViewAs(float64(done)/3.0))
+	if len(m.updateErrs) > 0 {
+		lines = append(lines, "", th.Err.Render(truncate(fmt.Sprintf("! %d step(s) had problems — see Activity", len(m.updateErrs)), innerW)))
+	}
 	if m.updateStep == stepDone {
 		lines = append(lines, "", th.Subtle.Render(m.spinner.View()+" refreshing status…"))
 	}

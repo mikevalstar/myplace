@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -14,6 +16,13 @@ import (
 	"github.com/mikevalstar/myplace/internal/mise"
 	"github.com/mikevalstar/myplace/internal/version"
 )
+
+// statusTimeout bounds the whole drift computation — the git fetch included —
+// so a wedged network can't hang a headless status forever (ADR-0006: fail
+// fast, never hang). Generous by design, and the same ceiling the TUI uses;
+// on expiry the pending checks fail and the verdict degrades to unknown
+// (exit 2), the documented "e.g. offline" case.
+const statusTimeout = 2 * time.Minute
 
 // interactive reports whether a human is plausibly at the keyboard.
 func interactive() bool {
@@ -45,7 +54,9 @@ func newStatusCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 			annInteractive:  "false",
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rep := drift.Compute(cmd.Context(), ch, ms, version.Version)
+			ctx, cancel := context.WithTimeout(cmd.Context(), statusTimeout)
+			defer cancel()
+			rep := drift.Compute(ctx, ch, ms, version.Version)
 			logger.Info("status", "verdict", rep.Verdict,
 				"to_apply", len(rep.Dotfiles.ToApply), "local_modified", len(rep.Dotfiles.LocalModified),
 				"tools_missing", len(rep.Tools.Missing), "tools_outdated", len(rep.Tools.Outdated))

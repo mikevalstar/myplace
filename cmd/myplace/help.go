@@ -88,7 +88,7 @@ func newHelpCmd() *cobra.Command {
 			"Add a command name to scope either view to one command.",
 		Annotations: map[string]string{
 			annHeadless:     "myplace help --llm",
-			annExitCodes:    "0=success",
+			annExitCodes:    "0=success;3=unknown command",
 			annOutputSchema: "docs/features/llm-friendly-help.md",
 			annInteractive:  "true",
 			annNote:         "--json emits the command manifest; --llm a copy-paste agent brief. `myplace help <command> --json|--llm` scopes either to one command.",

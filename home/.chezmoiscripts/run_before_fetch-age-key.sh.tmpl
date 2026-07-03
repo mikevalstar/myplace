@@ -1,0 +1,37 @@
+{{- /*
+Fetch this machine's age identity from 1Password — the key that decrypts the
+repo's encrypted dotfiles (the SSH host list, ADR-0022). Self-healing: this is
+a plain run_before_ script whose template renders EMPTY — chezmoi then skips
+it entirely (no run, no `status` entry) — whenever the key file exists and is
+non-empty. If the key is missing OR empty (a lost file, an interrupted fetch),
+the script renders and runs on every apply until the key is back in place; no
+manual re-fetch step needed. Desktops only: servers always render empty (their
+encrypted targets are .chezmoiignore'd, so they never need the key or `op`).
+This is the ONE place `op` is needed at converge time; status/diff/apply are
+1Password-free once the key is in place.
+*/ -}}
+{{ $key := joinPath .chezmoi.homeDir ".config/chezmoi/key.txt" -}}
+{{ $ki := stat $key -}}
+{{ if and (ne .profile "server") (or (not $ki) (eq ($ki.size | int) 0)) -}}
+#!/bin/sh
+set -eu
+if ! command -v op >/dev/null 2>&1; then
+	echo "myplace: the 1Password CLI (op) is needed to fetch the age key." >&2
+	echo "myplace: install it and sign in (macOS: brew install --cask 1password-cli," >&2
+	echo "myplace: Linux desktop: re-run apply after the provision script installs it)." >&2
+	exit 1
+fi
+echo "myplace: fetching age key from 1Password" >&2
+umask 077
+mkdir -p "$HOME/.config/chezmoi"
+# Fetch to a temp file and move into place only on success: a failed or
+# interrupted fetch must never leave a truncated/empty key.txt behind (a plain
+# `>` redirect would create the file before op even ran).
+# --account: required on machines signed into more than one 1Password account;
+# harmless when only the personal account is present.
+tmp="$HOME/.config/chezmoi/key.txt.tmp.$$"
+trap 'rm -f "$tmp"' EXIT
+op document get "chezmoi age key" --vault Private --account my.1password.com > "$tmp"
+[ -s "$tmp" ] || { echo "myplace: fetched key is empty; not installing it" >&2; exit 1; }
+mv "$tmp" "$HOME/.config/chezmoi/key.txt"
+{{ end -}}

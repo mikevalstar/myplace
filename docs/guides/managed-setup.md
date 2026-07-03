@@ -174,9 +174,10 @@ The worked example is the SSH host list
 `~/.ssh/config.d/hosts`, `Include`d by `~/.ssh/config` on desktops):
 
 1. **Reuse the fleet key — don't mint per-file keys.** One age identity lives
-   at `~/.config/chezmoi/key.txt` on every desktop (fetched once per machine
-   from the `chezmoi age key` 1Password Document by
-   `.chezmoiscripts/run_once_before_fetch-age-key.sh.tmpl`); its public half is
+   at `~/.config/chezmoi/key.txt` on every desktop (fetched from the
+   `chezmoi age key` 1Password Document by
+   `.chezmoiscripts/run_before_fetch-age-key.sh.tmpl` whenever it's missing or
+   empty — normally just once, at first apply); its public half is
    the `recipient` committed in `.chezmoi.toml.tmpl`'s `[age]` section.
 2. **Encrypt the content into the repo.** From a checkout, on any machine that
    has the key:
@@ -226,16 +227,17 @@ Tool init (`eval "$(x init zsh)"`, PATH additions) goes in `dot_mvdotfiles.zsh`,
   every target-state computation, entirely offline: `myplace status`/`diff`/
   `apply` never touch `op` (the always-on soft dependency ADR-0016 accepted;
   removed by [ADR-0022](../adrs/0022-age-encrypted-dotfiles.md)). The key
-  arrives via `run_once_before_fetch-age-key.sh.tmpl` at a machine's *first*
-  apply — the one moment a signed-in `op` is required. A machine missing the
-  key errors on status/apply (exit 3); since run_once won't re-fire, re-fetch
-  by hand: `op document get "chezmoi age key" --vault Private --account
-  my.1password.com > ~/.config/chezmoi/key.txt` then `chmod 600` it. Two more
-  traps: age output is randomized, so re-encrypting unchanged content makes a
-  spurious *git* diff (machines see no drift — chezmoi compares plaintext —
-  but don't commit it); and servers never need the key — their encrypted
-  targets are ignored in `.chezmoiignore`, so don't "fix" a server by copying
-  the key onto it.
+  arrives via `run_before_fetch-age-key.sh.tmpl`, which fetches from 1Password
+  whenever the key file is missing **or empty** — normally just the machine's
+  first apply, the one moment a signed-in `op` is required; while a non-empty
+  key is in place the script renders empty and chezmoi skips it. A machine
+  missing the key errors on `status`/`diff` (exit 3) until the next
+  apply/update re-fetches it — the fix is `myplace update` with `op` signed
+  in, not a hand-run `op document get`. Two more traps: age output is
+  randomized, so re-encrypting unchanged content makes a spurious *git* diff
+  (machines see no drift — chezmoi compares plaintext — but don't commit it);
+  and servers never need the key — their encrypted targets are ignored in
+  `.chezmoiignore`, so don't "fix" a server by copying the key onto it.
 - **Commit signing auto-enables only when a key is present.** `dot_gitconfig.tmpl` turns on SSH signing when `~/.ssh/id_ed25519.pub` (or the `signingKey` data override) exists, so a keyless machine signs nothing and never fails a commit. After a machine starts signing, upload the **public** key to GitHub as a *signing* key (separate from an auth key) once for the Verified badge: `gh ssh-key add ~/.ssh/id_ed25519.pub --type signing --title "$(hostname)"` ([ADR-0015](../adrs/0015-git-defaults-and-ssh-commit-signing.md)).
 
 ## References

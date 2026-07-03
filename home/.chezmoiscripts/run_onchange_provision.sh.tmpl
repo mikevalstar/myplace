@@ -269,7 +269,7 @@ fi
 [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ] && ensure_tool container container
 
 # --- 1Password CLI (macOS-only cask; servers never need it — ADR-0022). On a
-# desktop `op` is needed once, at first apply: run_once_before_fetch-age-key
+# desktop `op` is needed once, at first apply: run_before_fetch-age-key
 # pulls the age identity (which decrypts the SSH host list) from 1Password.
 # After that, day-to-day status/diff/apply never touch it — it's kept for
 # editing 1Password-stored secrets. Enable the app's "Integrate with 1Password
@@ -297,7 +297,7 @@ ensure_cask orchard
 # Linux, so the headless Linux servers — same OS — skip it entirely.
 
 # 1Password CLI — a desktop needs a working `op` once, at first apply, when
-# run_once_before_fetch-age-key pulls the age identity from 1Password (ADR-0022),
+# run_before_fetch-age-key pulls the age identity from 1Password (ADR-0022),
 # and thereafter only to edit 1Password-stored secrets. The catch (learned the
 # hard way, ADR-0017): the
 # desktop-app integration only trusts an `op` binary that is root-owned and setgid

@@ -82,7 +82,7 @@ The first cut was a static display — three read-only panes that ignored most o
 
 ### Per-step update progress
 
-`u` runs the converge-only update (same as headless `myplace update --yes`): chezmoi apply (skipped, with a notice, when local edits are present — see [ADR-0006](../adrs/0006-agent-runnable-commands.md)), then mise install, then mise upgrade. It's shown as a **floating modal window** centered over a dimmed (disabled) copy of the dashboard, containing a progress bar and a per-step checklist — completed steps `✓`, the active step a live spinner, pending steps `·` — advancing as each step finishes, then it reloads status. The backdrop stays visible (greyed) so context isn't lost; input is inert until the converge completes. It stays converge-only and mutates nothing else. (On a terminal too small to composite, it falls back to the modal centered on a blank screen.)
+`u` runs the converge-only update (same as headless `myplace update --yes`): chezmoi apply (skipped, with a notice, when local edits are present — see [ADR-0006](../adrs/0006-agent-runnable-commands.md)), then mise install, then mise upgrade. It's shown as a **floating modal window** centered over a dimmed (disabled) copy of the dashboard, containing a progress bar and a per-step checklist — completed steps `✓` (`✗` when the step failed, `↷` when it was skipped for local edits), the active step a live spinner, pending steps `·` — advancing as each step finishes, then it reloads status; when any step had problems the modal says so and points at the Activity pane. The backdrop stays visible (greyed) so context isn't lost; input is inert until the converge completes. It stays converge-only and mutates nothing else. (On a terminal too small to composite, it falls back to the modal centered on a blank screen.)
 
 ### Help overlay
 
@@ -128,6 +128,7 @@ Each dashboard card carries its own **accent** (Dotfiles / Tools / Updates), sho
 | `tab` / `shift+tab`, `h`/`l`, `←`/`→` | move focus between panes | dashboard |
 | `j`/`k`, `↑`/`↓` | select item in focused pane / scroll detail | dashboard, detail, `o` |
 | `enter` | open detail for the selected item | dashboard (narrow) |
+| `pgup`/`pgdn`, `ctrl+u`/`ctrl+d` | scroll the inline detail panel without moving the selection | dashboard (wide) |
 | `r` | refresh (recompute status + reload inventory; re-run checks in `d`) | dashboard, `d` view |
 | `u` | update (converge) | dashboard |
 | `o` | open the outdated detail view | dashboard |
@@ -138,7 +139,7 @@ Each dashboard card carries its own **accent** (Dotfiles / Tools / Updates), sho
 | `f` | toggle follow (pin to newest lines) | `a` view |
 | `?` | toggle the help overlay | global |
 | `esc` | close overlay / clear filter / back from detail, `o`, `d`, or `a` | contextual |
-| `q` / `ctrl+c` | quit | global |
+| `q` / `ctrl+c` | quit | global (while the update modal is up, only `ctrl+c` quits — everything else is inert) |
 
 ## Acceptance criteria
 

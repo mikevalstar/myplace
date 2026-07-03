@@ -31,3 +31,16 @@ ready to build; check it off (or delete it) when done.
   read-only `outdated` skills source shipped in [ADR-0023](docs/adrs/0023-managing-ai-skills.md).
   Write a feature spec (and confirm the CLI's non-interactive `add`/`remove -g`
   surface) before building.
+- [ ] **`update --on-local-edits=keep|discard|skip`** — a headless resolution for
+  local edits, the flag pattern [ADR-0006](docs/adrs/0006-agent-runnable-commands.md)
+  itself names. Today local-edit drift can only be resolved at a TTY; an agent
+  driving `update --yes` can report the edits but never act on them.
+- [ ] **Doctor check for the age key** — on non-`server` profiles: key file
+  present, non-empty, and actually decrypts a probe target ([ADR-0022](docs/adrs/0022-age-encrypted-dotfiles.md)).
+  Turns a missing/broken key into a named remedy ("run `myplace update` with
+  `op` signed in") instead of a cryptic decrypt failure on status/apply.
+- [ ] **`update --dry-run`** — print the steps that would run and the incoming
+  per-file diff without touching anything, reusing the existing review machinery.
+- [ ] **`myplace log`** — `--tail N` / `--follow` / `--json` over the state log
+  (`$XDG_STATE_HOME/myplace/myplace.log`), so "what happened on this box" doesn't
+  require remembering the path ([logging spec](docs/features/logging.md)).

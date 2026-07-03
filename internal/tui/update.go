@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -229,9 +230,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) advanceUpdate(msg stepDoneMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case msg.skipped:
+		m.stepOutcomes[msg.step] = outcomeSkipped
 		m.updateErrs = append(m.updateErrs, "local edits present — run `myplace update` in a terminal to review them (keep/discard); skipped dotfiles apply to avoid overwriting")
 	case msg.err != nil:
+		m.stepOutcomes[msg.step] = outcomeFailed
 		m.updateErrs = append(m.updateErrs, stepLabel(msg.step)+": "+msg.err.Error())
+	default:
+		m.stepOutcomes[msg.step] = outcomeOK
 	}
 	switch msg.step {
 	case stepChezmoi:
@@ -269,6 +274,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// ctrl+c always quits, even mid-filter.
 	if msg.String() == "ctrl+c" {
 		return m, tea.Quit
+	}
+	// While the converge modal is up, input is inert (per the dashboard spec):
+	// switching views would hide the in-flight update, and `q` would abandon
+	// it mid-mutation. ctrl+c (above) stays as the hard escape hatch.
+	if m.updating {
+		return m, nil
 	}
 	// While typing a filter, keystrokes belong to the text input (except the
 	// keys that end filtering, handled by the owning view).
@@ -340,6 +351,7 @@ func (m Model) updateDashboard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updating = true
 			m.updateStep = stepChezmoi
 			m.updateErrs = nil
+			m.stepOutcomes = map[updateStep]stepOutcome{}
 			return m, tea.Batch(m.spinner.Tick, m.chezmoiStepCmd())
 		}
 	case msg.String() == "shift+tab" || key.Matches(msg, m.keys.Left):
@@ -354,6 +366,15 @@ func (m Model) updateDashboard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Down):
 		m.moveSel(1)
 		return m, m.syncDetail()
+	case key.Matches(msg, m.keys.Scroll):
+		// Wide layout: the detail panel is inline beside the panes, so give it
+		// dedicated scroll keys that don't move the selection. (On narrow
+		// terminals `enter` opens the detail full-screen, which scrolls itself.)
+		if m.wide() {
+			var cmd tea.Cmd
+			m.detailVP, cmd = m.detailVP.Update(msg)
+			return m, cmd
+		}
 	case key.Matches(msg, m.keys.Enter):
 		// On narrow terminals the detail isn't shown beside the panes, so
 		// `enter` opens it full-screen. On wide terminals it's already visible.
@@ -588,6 +609,12 @@ func (m *Model) syncDetail() tea.Cmd {
 		m.sel[m.focus] = len(items) - 1
 	}
 	it := items[m.sel[m.focus]]
+	// A different item means fresh content: reset the scroll so it opens at the
+	// top instead of inheriting the previous item's offset.
+	if dk := fmt.Sprintf("%d/%d/%s/%s", m.focus, it.kind, it.path, it.title); dk != m.detailKey {
+		m.detailKey = dk
+		m.detailVP.GotoTop()
+	}
 	switch it.kind {
 	case kindDiff:
 		if d, ok := m.diffCache[it.path]; ok {

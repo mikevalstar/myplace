@@ -78,9 +78,14 @@ later independently of this ADR.
   secret. The *private* half lives at `~/.config/chezmoi/key.txt` (0600) on
   every desktop, and canonically as the **`chezmoi age key` Document**
   (`Private` vault, personal account) in 1Password.
-- **`run_once_before_fetch-age-key.sh.tmpl`** pulls the key from 1Password at
-  a machine's first apply — the single remaining `op` touchpoint at converge
-  time, once per machine lifetime. Profile-gated: servers render it a no-op.
+- **`run_before_fetch-age-key.sh.tmpl`** pulls the key from 1Password — the
+  single remaining `op` touchpoint at converge time. It's a plain `run_before_`
+  script whose template renders **empty** (so chezmoi skips it — no run, no
+  `status` entry) whenever the key file exists and is non-empty; it renders and
+  runs only while the key is missing or empty, i.e. normally once per machine
+  lifetime, at first apply. It fetches to a temp file and moves it into place
+  only on success, so a failed fetch can never leave a truncated key behind.
+  Profile-gated: servers always render it empty.
 - **The SSH host list moves into the repo as ciphertext**:
   `home/private_dot_ssh/private_config.d/encrypted_private_hosts.age` →
   `~/.ssh/config.d/hosts`, `Include`d by the (public, template-rendered)
@@ -128,9 +133,13 @@ session to unlock.
 - **A fresh desktop still needs a signed-in `op` before first apply** — same
   as under 0016 (where the very first apply needed it too); the standing
   practice of installing 1Password first on interactive machines is unchanged.
-- **`run_once` means lost keys aren't self-healing**: if `key.txt` is deleted,
-  the fetch script won't re-fire; re-fetch by hand (documented in the script
-  header and the workflow).
+- **Lost keys are self-healing**: if `key.txt` is deleted or left empty, the
+  fetch script re-renders and re-fires on the next apply/update (it just needs
+  a signed-in `op`). `status`/`diff` on such a machine still error until that
+  apply happens — the fix is `myplace update`, not a hand-run `op` command.
+  (Originally a `run_once_` script, which recorded itself as run even when a
+  failed fetch left an empty key file behind — amended 2026-07-03 to the
+  render-empty `run_before_` form above.)
 - **Generalizes**: future secret-bearing dotfiles are `encrypted_` files under
   the same recipient — no new 1Password Documents, no new mechanism. And
   because decryption is offline, a future *server-side* secret is now possible

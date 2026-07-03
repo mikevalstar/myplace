@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -121,7 +122,9 @@ func newRootCmd(r run.Runner, ch *chezmoi.Client, ms *mise.Client) *cobra.Comman
 			// read-only status summary, which is the useful no-arg answer.
 			// (ADR-0006: every command path is agent-runnable.)
 			if !interactive() {
-				rep := drift.Compute(ctx, ch, ms, version.Version)
+				sctx, cancel := context.WithTimeout(ctx, statusTimeout)
+				defer cancel()
+				rep := drift.Compute(sctx, ch, ms, version.Version)
 				logger.Info("status (bare, non-interactive)", "verdict", rep.Verdict)
 				fmt.Print(renderStatusText(rep))
 				os.Exit(drift.ExitCode(rep.Verdict))

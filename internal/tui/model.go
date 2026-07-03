@@ -80,6 +80,17 @@ const (
 	stepDone
 )
 
+// stepOutcome records how a finished update step actually ended, so the
+// modal's checklist can mark a failure or skip instead of a blanket ✓.
+type stepOutcome int
+
+const (
+	outcomePending stepOutcome = iota
+	outcomeOK
+	outcomeFailed
+	outcomeSkipped
+)
+
 // How deep the modeActivity view reads into the log: far deeper than the
 // pane's 200-line tail — with ~5 MB rotation, 1 MB is the whole recent file in
 // practice — but still a bounded window so the 1-second tick stays cheap.
@@ -167,9 +178,10 @@ type Model struct {
 	mode mode
 
 	// interactive navigation
-	focus    focus
-	sel      [focusCount]int // selection index per pane
-	detailVP viewport.Model  // diff / detail panel (master-detail + narrow modeDetail)
+	focus     focus
+	sel       [focusCount]int // selection index per pane
+	detailVP  viewport.Model  // diff / detail panel (master-detail + narrow modeDetail)
+	detailKey string          // identity of the item the detail shows; scroll resets when it changes
 
 	// per-file diff cache, so re-selecting doesn't re-shell chezmoi diff
 	diffCache   map[string]string
@@ -194,10 +206,11 @@ type Model struct {
 	showHelp bool
 
 	// converge-only update progress
-	updating   bool
-	updateStep updateStep
-	updateErrs []string
-	progress   progress.Model
+	updating     bool
+	updateStep   updateStep
+	updateErrs   []string
+	stepOutcomes map[updateStep]stepOutcome
+	progress     progress.Model
 
 	// outdated detail view
 	vp        viewport.Model // scrollable body for modeOutdated
@@ -215,16 +228,17 @@ func New(ch *chezmoi.Client, ms *mise.Client, si *sysinfo.Client, sources []outd
 	fi.CharLimit = 64
 	return Model{
 		ch: ch, ms: ms, si: si, sources: sources, version: version, docOpts: docOpts,
-		theme:       DefaultTheme(),
-		keys:        newKeyMap(),
-		help:        help.New(),
-		spinner:     sp,
-		loading:     true,
-		invLoading:  true,
-		progress:    progress.New(progress.WithoutPercentage()),
-		filter:      fi,
-		diffCache:   map[string]string{},
-		diffPending: map[string]bool{},
+		theme:        DefaultTheme(),
+		keys:         newKeyMap(),
+		help:         help.New(),
+		spinner:      sp,
+		loading:      true,
+		invLoading:   true,
+		progress:     progress.New(progress.WithoutPercentage()),
+		filter:       fi,
+		diffCache:    map[string]string{},
+		diffPending:  map[string]bool{},
+		stepOutcomes: map[updateStep]stepOutcome{},
 	}
 }
 

@@ -12,6 +12,7 @@ type keyMap struct {
 	Up       key.Binding // k / ↑ select up / scroll
 	Down     key.Binding // j / ↓ select down / scroll
 	Enter    key.Binding // open detail (narrow)
+	Scroll   key.Binding // pgup/pgdn (+ ctrl+u/d) scroll the inline detail panel (wide dashboard)
 	Refresh  key.Binding // r (also re-runs checks in the doctor view)
 	Update   key.Binding // u
 	Outdated key.Binding // o
@@ -33,6 +34,7 @@ func newKeyMap() keyMap {
 		Up:       key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
 		Down:     key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
 		Enter:    key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "detail")),
+		Scroll:   key.NewBinding(key.WithKeys("pgup", "pgdown", "ctrl+u", "ctrl+d"), key.WithHelp("pgup/pgdn", "scroll detail")),
 		Refresh:  key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
 		Update:   key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "update")),
 		Outdated: key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "outdated")),
@@ -55,7 +57,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 // FullHelp is the `?` overlay grid.
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Focus, k.Left, k.Right, k.Up, k.Down},
+		{k.Focus, k.Left, k.Right, k.Up, k.Down, k.Scroll},
 		{k.Enter, k.Refresh, k.Update, k.Outdated, k.Doctor, k.Activity},
 		{k.Sort, k.Filter, k.Follow, k.Help, k.Esc, k.Quit},
 	}
