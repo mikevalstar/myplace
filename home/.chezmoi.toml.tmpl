@@ -15,6 +15,10 @@
 encryption = "age"
 
 [age]
+    # useBuiltin: decrypt with chezmoi's bundled age, never an `age` binary
+    # found on PATH — a stray/broken one (e.g. an orphaned mise shim) would
+    # otherwise take over and fail every status/diff/apply.
+    useBuiltin = true
     identity = "{{ .chezmoi.homeDir }}/.config/chezmoi/key.txt"
     recipient = "age1ph0y4eyan8l6lwg2dkjtzj7l52z5nrsz0g0qdqvrpc4e3znctgnqwyz4fa"
 
