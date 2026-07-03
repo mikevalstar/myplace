@@ -122,7 +122,12 @@ func newUpdateCmd(ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 					}
 					steps = append(steps, stepResult{Name: "chezmoi apply", OK: false, Error: msg})
 				} else {
-					if step("chezmoi pull", func() error { return ch.Pull(ctx) }) {
+					// Re-init between pull and apply so a config-template change
+					// that just arrived (e.g. the [age] section, ADR-0022) is in
+					// the machine-local chezmoi.toml before apply needs it.
+					// prompt*Once values carry over — this never asks again.
+					if step("chezmoi pull", func() error { return ch.Pull(ctx) }) &&
+						step("chezmoi init", func() error { return ch.InitConfig(ctx) }) {
 						step("chezmoi apply", func() error {
 							if mods := localModified(ctx, ch); len(mods) > 0 {
 								return fmt.Errorf("not applied — local edits to %s; run `myplace update` (interactive) to keep or discard them", strings.Join(mods, ", "))

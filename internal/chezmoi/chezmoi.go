@@ -207,8 +207,22 @@ func (c *Client) Uncommitted(ctx context.Context) (int, error) {
 }
 
 // Update pulls the source repo and applies the result (chezmoi update).
+// --init regenerates the machine-local chezmoi.toml from .chezmoi.toml.tmpl
+// each run, so config template changes (e.g. the [age] section, ADR-0022) roll
+// out with an ordinary update; prompt*Once values carry over, so it never asks
+// again.
 func (c *Client) Update(ctx context.Context) error {
-	_, err := c.cz(ctx, "update")
+	_, err := c.cz(ctx, "update", "--init")
+	return err
+}
+
+// InitConfig regenerates the machine-local chezmoi.toml from the source repo's
+// .chezmoi.toml.tmpl without applying anything (chezmoi init, no repo arg).
+// The update command runs it between pull and apply for the same reason
+// Update passes --init: apply must see config changes that arrived with the
+// pull. Idempotent when the template is unchanged.
+func (c *Client) InitConfig(ctx context.Context) error {
+	_, err := c.cz(ctx, "init")
 	return err
 }
 
