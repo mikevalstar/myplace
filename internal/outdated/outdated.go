@@ -16,6 +16,7 @@ import (
 
 	"github.com/mikevalstar/myplace/internal/brew"
 	"github.com/mikevalstar/myplace/internal/mise"
+	"github.com/mikevalstar/myplace/internal/shelly"
 )
 
 // Schema is bumped only on breaking changes to the JSON shape (mirrors
@@ -140,6 +141,28 @@ func BrewSource(c *brew.Client) Source { return brewSource{c} }
 func (s brewSource) Name() string                       { return "brew" }
 func (s brewSource) Available(ctx context.Context) bool { return s.c.Installed(ctx) }
 func (s brewSource) Outdated(ctx context.Context) ([]Package, error) {
+	p, err := s.c.Outdated(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pkgs := make([]Package, 0, len(p))
+	for _, e := range p {
+		pkgs = append(pkgs, Package{Name: e.Name, Current: e.Current, Latest: e.Latest})
+	}
+	return pkgs, nil
+}
+
+type shellySource struct{ c *shelly.Client }
+
+// ShellySource adapts a Shelly client (CachyOS). Like brew it's present-if-
+// installed: Available() gates the shell-out, so Shelly is silently skipped when
+// it isn't on PATH (i.e. everywhere but a CachyOS box). One row aggregates every
+// channel Shelly manages — native repos, AUR, Flatpak, AppImage (ADR-0010).
+func ShellySource(c *shelly.Client) Source { return shellySource{c} }
+
+func (s shellySource) Name() string                       { return "shelly" }
+func (s shellySource) Available(ctx context.Context) bool { return s.c.Installed(ctx) }
+func (s shellySource) Outdated(ctx context.Context) ([]Package, error) {
 	p, err := s.c.Outdated(ctx)
 	if err != nil {
 		return nil, err

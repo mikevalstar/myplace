@@ -17,6 +17,7 @@ import (
 	"github.com/mikevalstar/myplace/internal/mise"
 	"github.com/mikevalstar/myplace/internal/outdated"
 	"github.com/mikevalstar/myplace/internal/run"
+	"github.com/mikevalstar/myplace/internal/shelly"
 	"github.com/mikevalstar/myplace/internal/sysinfo"
 	"github.com/mikevalstar/myplace/internal/tui"
 	"github.com/mikevalstar/myplace/internal/version"
@@ -76,12 +77,14 @@ func main() {
 // main and the help tests so the tree under test is exactly the real one.
 func newRootCmd(r run.Runner, ch *chezmoi.Client, ms *mise.Client) *cobra.Command {
 	// Package-manager sources for `outdated` and the dashboard's Updates pane.
-	// Slice order is display order. The brew source self-reports Available()
-	// == false when brew isn't on PATH, so listing it is safe everywhere
-	// (brew-if-present, ADR-0008/0009/0010).
+	// Slice order is display order. Each source self-reports Available() == false
+	// when its CLI isn't on PATH, so listing them all is safe everywhere: brew
+	// shows up on Macs, shelly on CachyOS, mise anywhere (present-if-installed,
+	// ADR-0008/0009/0010).
 	sources := []outdated.Source{
 		outdated.MiseSource(ms),
 		outdated.BrewSource(brew.New(r)),
+		outdated.ShellySource(shelly.New(r)),
 	}
 	root := &cobra.Command{
 		Use:   "myplace",

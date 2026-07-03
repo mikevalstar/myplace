@@ -2,8 +2,8 @@
 title: Outdated packages (cross–package-manager inventory)
 status: accepted
 created: 2026-06-13
-updated: 2026-06-13
-tags: [outdated, packages, mise, homebrew, cli, json, tui]
+updated: 2026-07-03
+tags: [outdated, packages, mise, homebrew, shelly, cachyos, cli, json, tui]
 phase: 1
 ---
 
@@ -11,7 +11,7 @@ phase: 1
 
 ## Summary
 
-`myplace outdated` lists packages with a newer version available, grouped by package manager — **mise** today, **Homebrew** when it's present, and more managers as they're added. It's available headlessly (`--json`) and as a TUI view (a summary pane on the dashboard plus a scrollable detail screen). It is **informational and read-only**: it reports what's upgradable — including packages myplace doesn't manage — and never changes the machine.
+`myplace outdated` lists packages with a newer version available, grouped by package manager — **mise** today, **Homebrew** when it's present, **Shelly** on CachyOS, and more managers as they're added. It's available headlessly (`--json`) and as a TUI view (a summary pane on the dashboard plus a scrollable detail screen). It is **informational and read-only**: it reports what's upgradable — including packages myplace doesn't manage — and never changes the machine.
 
 ## Motivation
 
@@ -22,7 +22,7 @@ The machine has software from several sources: mise (dev tools/runtimes), Homebr
 ### In scope
 
 - A cross-manager inventory of outdated packages, grouped by source.
-- Sources: **mise** (reuses `mise outdated`) and **Homebrew** (`brew outdated --json=v2`, formulae + casks). brew is included only when it's on PATH.
+- Sources: **mise** (reuses `mise outdated`), **Homebrew** (`brew outdated --json=v2`, formulae + casks), and **Shelly** (CachyOS — `shelly check-updates --json`, aggregating native Arch repos + AUR + Flatpak + AppImage into one row; secondary channels are name-prefixed, e.g. `flatpak:org.gimp.GIMP`). brew and shelly are each included only when their CLI is on PATH (so shelly shows up on CachyOS, brew on Macs).
 - Packages myplace does **not** manage (most brew formulae) are shown — this is inventory, not just managed drift.
 - Headless `myplace outdated --json` and a TUI view + a dashboard summary pane.
 - A pluggable source interface so new managers (apt/dnf, npm, pipx, cargo) are one adapter each.
@@ -32,6 +32,7 @@ The machine has software from several sources: mise (dev tools/runtimes), Homebr
 - **Upgrading anything.** This feature only reads. brew in particular is never upgraded (ADR-0008/0009). Converging *mise* tools to their pinned versions remains `myplace update`'s job.
 - **Affecting the `status`/drift verdict or its exit codes.** Outdated inventory is informational; the status verdict stays mise-only. See [ADR-0010](../adrs/0010-cross-package-manager-outdated-inventory.md).
 - **Running `brew update`** to refresh brew's view (mutating/slow). Freshness reflects the user's last `brew update`.
+- **Running `shelly sync`/`update`/`upgrade`** — same read-only stance as brew: `outdated` only reads Shelly's local update list (`check-updates`), never refreshes its databases or installs anything. Freshness reflects the user's last sync.
 - **Non-mac Homebrew install** — brew is read-if-present, never installed here.
 
 ## Behavior
@@ -82,14 +83,15 @@ So `myplace outdated --json; echo $?` tells an agent "is anything upgradable her
 ```
 
 - `schema` — bumped only on breaking changes (mirrors the drift envelope).
-- `sources[]` — one entry per source, in a stable display order (mise, then brew, then future managers).
-- `sources[].available` — `false` when the manager isn't on PATH; its `packages` is then `[]`.
+- `sources[]` — one entry per source, in a stable display order (mise, then brew, then shelly, then future managers).
+- `sources[].available` — `false` when the manager isn't on PATH; its `packages` is then `[]`. In practice brew is `available` only on Macs and shelly only on CachyOS.
 - `sources[].error` — present (string) only when that source was available but failed; other sources are unaffected.
-- `packages[].current` / `latest` — installed version and the newer one offered. For mise, `latest` is the version mise would converge to; for brew it's `current_version` from `brew outdated`.
+- `packages[].current` / `latest` — installed version and the newer one offered. For mise, `latest` is the version mise would converge to; for brew it's `current_version` from `brew outdated`; for shelly it's the new version from `shelly check-updates`.
+- For **shelly**, `packages[].name` from a secondary channel is prefixed with that channel (`aur:`, `flatpak:`, `appimage:`) so the single row stays legible; native repo packages keep their bare name.
 
 ### TUI
 
-- **Dashboard home** gains an **"Updates available"** pane next to Dotfiles and Tools, showing per-source counts (`mise: N`, `brew: M`, or `n/a` when a source is absent) and a `press o for details` hint. It loads asynchronously alongside the status report; until it lands the pane shows `checking…`. It does **not** change the verdict badge.
+- **Dashboard home** gains an **"Updates available"** pane next to Dotfiles and Tools, showing per-source counts (`mise: N`, `brew: M`, `shelly: K`, or `n/a` when a source is absent — so shelly reads `n/a` on Macs and a count on CachyOS) and a `press o for details` hint. It loads asynchronously alongside the status report; until it lands the pane shows `checking…`. It does **not** change the verdict badge.
 - **`o`** opens a dedicated, scrollable outdated view (a `bubbles` viewport) rendering every outdated package as a bordered `lipgloss/table` (PACKAGE · CURRENT · LATEST · SOURCE). It carries a **count summary** (`N outdated across M sources`, and `X of N shown` when filtered), a **sort** toggle (`s` cycles by source / by name; by-source keeps the grouped layout, by-name flattens into one alphabetical list annotated with each package's source), and a **filter** (`/` focuses a text input for a case-insensitive substring match on the package name; `esc` clears it). `↑/↓`/`pgup`/`pgdn` scroll; `esc`/`q` returns to the dashboard; `ctrl+c` quits. Sort and filter are pure presentation over the already-collected inventory — no recompute, no extra command runs.
 
 ## Acceptance criteria
