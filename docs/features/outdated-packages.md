@@ -3,7 +3,7 @@ title: Outdated packages (cross–package-manager inventory)
 status: accepted
 created: 2026-06-13
 updated: 2026-07-03
-tags: [outdated, packages, mise, homebrew, shelly, cachyos, cli, json, tui]
+tags: [outdated, packages, mise, homebrew, shelly, cachyos, skills, ai, cli, json, tui]
 phase: 1
 ---
 
@@ -11,7 +11,7 @@ phase: 1
 
 ## Summary
 
-`myplace outdated` lists packages with a newer version available, grouped by package manager — **mise** today, **Homebrew** when it's present, **Shelly** on CachyOS, and more managers as they're added. It's available headlessly (`--json`) and as a TUI view (a summary pane on the dashboard plus a scrollable detail screen). It is **informational and read-only**: it reports what's upgradable — including packages myplace doesn't manage — and never changes the machine.
+`myplace outdated` lists packages with a newer version available, grouped by package manager — **mise** today, **Homebrew** when it's present, **Shelly** on CachyOS, **skills** (AI agent skills via the skills.sh CLI) when that CLI is installed, and more managers as they're added. It's available headlessly (`--json`) and as a TUI view (a summary pane on the dashboard plus a scrollable detail screen). It is **informational and read-only**: it reports what's upgradable — including packages myplace doesn't manage — and never changes the machine.
 
 ## Motivation
 
@@ -22,7 +22,7 @@ The machine has software from several sources: mise (dev tools/runtimes), Homebr
 ### In scope
 
 - A cross-manager inventory of outdated packages, grouped by source.
-- Sources: **mise** (reuses `mise outdated`), **Homebrew** (`brew outdated --json=v2`, formulae + casks), and **Shelly** (CachyOS — `shelly check-updates --json`, aggregating native Arch repos + AUR + Flatpak + AppImage into one row; secondary channels are name-prefixed, e.g. `flatpak:org.gimp.GIMP`). brew and shelly are each included only when their CLI is on PATH (so shelly shows up on CachyOS, brew on Macs).
+- Sources: **mise** (reuses `mise outdated`), **Homebrew** (`brew outdated --json=v2`, formulae + casks), **Shelly** (CachyOS — `shelly check-updates --json`, aggregating native Arch repos + AUR + Flatpak + AppImage into one row; secondary channels are name-prefixed, e.g. `flatpak:org.gimp.GIMP`), and **skills** (third-party AI agent skills — parses `skills check -g`, the skills.sh / `npx skills` CLI). brew, shelly, and skills are each included only when their CLI resolves (so shelly shows up on CachyOS, brew on Macs, skills wherever the `skills` CLI or `npx skills` is available). A user's *own* authored skills are chezmoi-managed dotfiles and don't appear here — only the third-party "stable" installed via the CLI ([ADR-0023](../adrs/0023-managing-ai-skills.md)).
 - Packages myplace does **not** manage (most brew formulae) are shown — this is inventory, not just managed drift.
 - Headless `myplace outdated --json` and a TUI view + a dashboard summary pane.
 - A pluggable source interface so new managers (apt/dnf, npm, pipx, cargo) are one adapter each.
@@ -83,15 +83,16 @@ So `myplace outdated --json; echo $?` tells an agent "is anything upgradable her
 ```
 
 - `schema` — bumped only on breaking changes (mirrors the drift envelope).
-- `sources[]` — one entry per source, in a stable display order (mise, then brew, then shelly, then future managers).
-- `sources[].available` — `false` when the manager isn't on PATH; its `packages` is then `[]`. In practice brew is `available` only on Macs and shelly only on CachyOS.
+- `sources[]` — one entry per source, in a stable display order (mise, then brew, then shelly, then skills, then future managers).
+- `sources[].available` — `false` when the manager isn't on PATH; its `packages` is then `[]`. In practice brew is `available` only on Macs, shelly only on CachyOS, and skills only where the skills.sh CLI resolves.
 - `sources[].error` — present (string) only when that source was available but failed; other sources are unaffected.
-- `packages[].current` / `latest` — installed version and the newer one offered. For mise, `latest` is the version mise would converge to; for brew it's `current_version` from `brew outdated`; for shelly it's the new version from `shelly check-updates`.
+- `packages[].current` / `latest` — installed version and the newer one offered. For mise, `latest` is the version mise would converge to; for brew it's `current_version` from `brew outdated`; for shelly it's the new version from `shelly check-updates`; for skills they're the current/latest refs `skills check` prints (git-based, so possibly a commit ref rather than semver, and either may be empty when the CLI prints no delta).
 - For **shelly**, `packages[].name` from a secondary channel is prefixed with that channel (`aur:`, `flatpak:`, `appimage:`) so the single row stays legible; native repo packages keep their bare name.
+- **skills is a text-parsed source, not JSON.** Unlike the others, `skills check` emits ANSI-colored *human* output and ignores `--json` (verified against skills v1.5.14 — only `skills list --json` is structured, and it carries no version info). So `internal/skills` strips ANSI and parses `check -g`'s text, the way `internal/chezmoi` line-parses `chezmoi status`. The all-clear ("✓ All global skills are up to date" → `packages: []`) and unavailable cases are verified; the *has-updates* line shape was not observable on an up-to-date machine, so that parse is best-effort and tolerant, isolated to `ParseCheck` for a one-line fix once a real outdated skill is seen (see the acceptance criteria).
 
 ### TUI
 
-- **Dashboard home** gains an **"Updates available"** pane next to Dotfiles and Tools, showing per-source counts (`mise: N`, `brew: M`, `shelly: K`, or `n/a` when a source is absent — so shelly reads `n/a` on Macs and a count on CachyOS) and a `press o for details` hint. It loads asynchronously alongside the status report; until it lands the pane shows `checking…`. It does **not** change the verdict badge.
+- **Dashboard home** gains an **"Updates available"** pane next to Dotfiles and Tools, showing per-source counts (`mise: N`, `brew: M`, `shelly: K`, `skills: J`, or `n/a` when a source is absent — so shelly reads `n/a` on Macs and skills reads `n/a` where the CLI isn't installed). The pane, its count chip, and the `o` detail table all iterate the inventory's `sources`, so a new source (like skills) appears with **no dashboard code change** — only a new adapter in the source slice. It carries a `press o for details` hint. It loads asynchronously alongside the status report; until it lands the pane shows `checking…`. It does **not** change the verdict badge.
 - **`o`** opens a dedicated, scrollable outdated view (a `bubbles` viewport) rendering every outdated package as a bordered `lipgloss/table` (PACKAGE · CURRENT · LATEST · SOURCE). It carries a **count summary** (`N outdated across M sources`, and `X of N shown` when filtered), a **sort** toggle (`s` cycles by source / by name; by-source keeps the grouped layout, by-name flattens into one alphabetical list annotated with each package's source), and a **filter** (`/` focuses a text input for a case-insensitive substring match on the package name; `esc` clears it). `↑/↓`/`pgup`/`pgdn` scroll; `esc`/`q` returns to the dashboard; `ctrl+c` quits. Sort and filter are pure presentation over the already-collected inventory — no recompute, no extra command runs.
 
 ## Acceptance criteria
@@ -104,6 +105,9 @@ So `myplace outdated --json; echo $?` tells an agent "is anything upgradable her
 - [x] Dashboard shows the "Updates available" pane with per-source counts; `o` opens a scrollable detail view; `esc` returns.
 - [ ] The `o` view shows a count summary and supports `s` (sort by source / name) and `/` (filter by name); both are presentation-only and run no extra command.
 - [x] Nothing in this feature ever installs or upgrades a package.
+- [x] The `skills` source reports `available: true, packages: []` on a machine whose global skills are current (verified end-to-end against skills v1.5.14 via `npx skills`), and `available: false` where the CLI can't be resolved.
+- [ ] Confirm `skills check -g`'s **has-updates** output shape against a machine with an outdated skill, and tighten `ParseCheck` (+ fixtures) to match — currently a documented best-effort parse.
+- [ ] Wire the managed setup: a `home/dot_claude/skills/` chezmoi tree for authored skills, and a profile-gated `skills add -g` source-list block in the provision script for the third-party stable (self-managed until [vercel-labs/skills#683](https://github.com/vercel-labs/skills/issues/683) enables a global lockfile restore — [ADR-0023](../adrs/0023-managing-ai-skills.md)).
 
 ## Open questions
 
@@ -117,3 +121,4 @@ So `myplace outdated --json; echo $?` tells an agent "is anything upgradable her
 - [TUI dashboard layout](tui-dashboard.md) — the home pane + the `o` detail view
 - [Review outdated packages workflow](../workflows/review-outdated-packages.md)
 - [ADR-0008](../adrs/0008-opportunistic-homebrew-macos.md) / [ADR-0009](../adrs/0009-homebrew-casks-macos.md) — why brew is read-only/informational here
+- [ADR-0023](../adrs/0023-managing-ai-skills.md) — the skills source: own skills via chezmoi, third-party via the skills.sh CLI, surfaced here informationally

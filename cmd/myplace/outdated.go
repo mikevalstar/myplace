@@ -15,17 +15,19 @@ func newOutdatedCmd(sources ...outdated.Source) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "outdated",
 		Short: "List outdated packages across package managers (read-only, informational)",
-		Long: "Reports packages with a newer version available, grouped by source (mise,\n" +
-			"and brew when present). Informational and read-only: it never upgrades\n" +
-			"anything, and it does NOT affect the drift verdict or `status` exit codes.\n" +
-			"brew is skipped when it isn't on PATH.\n" +
+		Long: "Reports packages with a newer version available, grouped by source: mise\n" +
+			"always, brew on Macs, shelly on CachyOS, and skills (AI agent skills via\n" +
+			"the skills.sh CLI) when that CLI is present. Informational and read-only:\n" +
+			"it never upgrades anything, and it does NOT affect the drift verdict or\n" +
+			"`status` exit codes. Each present-if-installed source is skipped when its\n" +
+			"CLI isn't resolvable.\n" +
 			"Exit codes: 0 all current, 1 updates available, 3 error.",
 		Annotations: map[string]string{
 			annHeadless:     "myplace outdated --json",
 			annExitCodes:    exitCodesOutdated,
 			annOutputSchema: "docs/features/outdated-packages.md",
 			annInteractive:  "false",
-			annNote:         "informational inventory; never mutates and never upgrades. brew is brew-if-present (skipped when not on PATH). Distinct from the drift verdict: 1 means 'updates available', not 'out of sync'.",
+			annNote:         "informational inventory; never mutates and never upgrades. Sources are present-if-installed (brew, shelly, and skills are skipped when their CLI isn't on PATH). Distinct from the drift verdict: 1 means 'updates available', not 'out of sync'.",
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			inv := outdated.Collect(cmd.Context(), sources...)

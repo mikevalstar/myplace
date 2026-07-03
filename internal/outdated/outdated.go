@@ -17,6 +17,7 @@ import (
 	"github.com/mikevalstar/myplace/internal/brew"
 	"github.com/mikevalstar/myplace/internal/mise"
 	"github.com/mikevalstar/myplace/internal/shelly"
+	"github.com/mikevalstar/myplace/internal/skills"
 )
 
 // Schema is bumped only on breaking changes to the JSON shape (mirrors
@@ -163,6 +164,30 @@ func ShellySource(c *shelly.Client) Source { return shellySource{c} }
 func (s shellySource) Name() string                       { return "shelly" }
 func (s shellySource) Available(ctx context.Context) bool { return s.c.Installed(ctx) }
 func (s shellySource) Outdated(ctx context.Context) ([]Package, error) {
+	p, err := s.c.Outdated(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pkgs := make([]Package, 0, len(p))
+	for _, e := range p {
+		pkgs = append(pkgs, Package{Name: e.Name, Current: e.Current, Latest: e.Latest})
+	}
+	return pkgs, nil
+}
+
+type skillsSource struct{ c *skills.Client }
+
+// SkillsSource adapts a skills client (skills.sh / `npx skills`). Like brew and
+// shelly it's present-if-installed: Available() gates the shell-out, so skills is
+// silently skipped when the CLI can't be resolved (a headless server with no
+// Node, or a box that never installed a skill). Reports third-party AI skills
+// with a newer version upstream; a user's own skills are chezmoi-managed dotfiles
+// and don't appear here (ADR-0023). Informational only — never mutates.
+func SkillsSource(c *skills.Client) Source { return skillsSource{c} }
+
+func (s skillsSource) Name() string                       { return "skills" }
+func (s skillsSource) Available(ctx context.Context) bool { return s.c.Installed(ctx) }
+func (s skillsSource) Outdated(ctx context.Context) ([]Package, error) {
 	p, err := s.c.Outdated(ctx)
 	if err != nil {
 		return nil, err

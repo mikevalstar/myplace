@@ -2,8 +2,8 @@
 title: Extending the managed setup (tools & dotfiles)
 status: active
 created: 2026-06-13
-updated: 2026-06-16
-tags: [chezmoi, mise, dotfiles, provisioning, how-to]
+updated: 2026-07-03
+tags: [chezmoi, mise, dotfiles, provisioning, skills, how-to]
 audience: both
 ---
 
@@ -144,6 +144,21 @@ it doesn't auto-track upstream — re-install by hand to bump. If the plugin bin
 behaviour to a key, note that **herdr 0.7 does not bind keys from a plugin
 manifest** — add a `[[keys.command]]` with `type = "plugin_action"` to the managed
 `home/dot_config/herdr/config.toml` (that's where the palette's `prefix+p` lives).
+
+### An AI agent skill
+
+Skills (a `SKILL.md` + optional supporting files that Claude Code and other agents discover) split into two kinds, managed two different ways ([ADR-0023](../adrs/0023-managing-ai-skills.md)) — the same dotfile-vs-tool split as everything else:
+
+**Your own authored skills → chezmoi**, like any dotfile. They live under a `home/dot_claude/skills/<name>/` tree → `~/.claude/skills/<name>/`; commit/push and `myplace update` applies them, with drift and diff review for free. Manage only `skills/` (and specific files like `settings.json`) — **not** all of `~/.claude`: `plugins/cache/`, logs, and history are machine-local, so `.chezmoiignore` them. Do **not** manage `~/.agents/skills/` either — that's the skills.sh CLI's own store (it symlinks from there into `~/.claude/skills/`), so managing it fights the CLI, the way adding node to mise fights fnm.
+
+**Third-party "stable" skills → the skills.sh CLI** (`skills`, aka `npx skills`), which is the AI-skill equivalent of a package manager. myplace treats it present-if-installed and *informational*: `myplace outdated` (and the dashboard's Updates pane) run `skills check -g` and list any skill behind upstream, but never upgrade — it's read-only, and it never touches the drift verdict ([ADR-0010](../adrs/0010-cross-package-manager-outdated-inventory.md)).
+
+Making the **global** set reproducible is self-managed for now, because the CLI can't yet restore a global stable from its lock (`experimental_install` is project-only; `~/.agents/.skill-lock.json` also carries volatile timestamp/UI state — [ADR-0023](../adrs/0023-managing-ai-skills.md), [vercel-labs/skills#683](https://github.com/vercel-labs/skills/issues/683)). So the declaration is a **source-repo list**, not a committed lockfile (not yet wired — the ADR's follow-up):
+
+- Add a profile-gated block to `run_onchange_provision.sh.tmpl` — `{{ if ne .profile "server" }}` (servers get no AI skills) — with a `for repo in … ; do npx --yes skills add "$repo" -g -s '*' -y ; done` loop, guarded on `command -v npx` (Node is fnm's, present on desktops per ADR-0007). That `for repo in …` list *is* the fleet's global stable; edit it to add/remove a skill. Fold `npx`'s presence into the onchange hash (a 1/0 boolean, like the herdr blocks) so it re-fires once Node lands.
+- **Migrate to a committed global lock** (`~/.agents/.skill-lock.json`, minus its volatile fields) driving a real `skills` restore command once #683 ships — 👍 that issue to move it along.
+
+Don't wire skill auto-updates via a Claude Code `SessionStart` hook (`npx skills update`) — that hides update state from myplace, which is where updates should surface and be driven.
 
 ### A dotfile that carries secrets (age-encrypted)
 

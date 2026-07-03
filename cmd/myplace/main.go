@@ -18,6 +18,7 @@ import (
 	"github.com/mikevalstar/myplace/internal/outdated"
 	"github.com/mikevalstar/myplace/internal/run"
 	"github.com/mikevalstar/myplace/internal/shelly"
+	"github.com/mikevalstar/myplace/internal/skills"
 	"github.com/mikevalstar/myplace/internal/sysinfo"
 	"github.com/mikevalstar/myplace/internal/tui"
 	"github.com/mikevalstar/myplace/internal/version"
@@ -79,12 +80,14 @@ func newRootCmd(r run.Runner, ch *chezmoi.Client, ms *mise.Client) *cobra.Comman
 	// Package-manager sources for `outdated` and the dashboard's Updates pane.
 	// Slice order is display order. Each source self-reports Available() == false
 	// when its CLI isn't on PATH, so listing them all is safe everywhere: brew
-	// shows up on Macs, shelly on CachyOS, mise anywhere (present-if-installed,
-	// ADR-0008/0009/0010).
+	// shows up on Macs, shelly on CachyOS, skills on any box with the skills.sh
+	// CLI, mise anywhere (present-if-installed, ADR-0008/0009/0010/0023). The TUI
+	// renders whatever's in this slice, so a new source needs no dashboard change.
 	sources := []outdated.Source{
 		outdated.MiseSource(ms),
 		outdated.BrewSource(brew.New(r)),
 		outdated.ShellySource(shelly.New(r)),
+		outdated.SkillsSource(skills.New(r)),
 	}
 	root := &cobra.Command{
 		Use:   "myplace",
