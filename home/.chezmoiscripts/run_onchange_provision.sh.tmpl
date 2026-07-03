@@ -268,10 +268,12 @@ fi
 # service manually after install: `container system start`. GUI is Orchard below.
 [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ] && ensure_tool container container
 
-# --- 1Password CLI (macOS-only cask; the Linux servers don't get the secret SSH
-# config that needs it — ADR-0016). `op` is what chezmoi's onepasswordDocument
-# shells out to when rendering ~/.ssh/config on desktops; enable the app's
-# "Integrate with 1Password CLI" setting once so it unlocks without a manual signin. ---
+# --- 1Password CLI (macOS-only cask; servers never need it — ADR-0022). On a
+# desktop `op` is needed once, at first apply: run_once_before_fetch-age-key
+# pulls the age identity (which decrypts the SSH host list) from 1Password.
+# After that, day-to-day status/diff/apply never touch it — it's kept for
+# editing 1Password-stored secrets. Enable the app's "Integrate with 1Password
+# CLI" setting once so it unlocks without a manual signin. ---
 ensure_cask 1password-cli
 
 # --- fonts (macOS Homebrew casks; the Linux *desktop* gets the same families
@@ -294,9 +296,10 @@ ensure_cask orchard
 # gated by chezmoi's .profile (that's why this script is a template) to non-server
 # Linux, so the headless Linux servers — same OS — skip it entirely.
 
-# 1Password CLI — for non-server profiles chezmoi renders ~/.ssh/config from the
-# host list stored in 1Password on every apply/status/diff (ADR-0016), so a Linux
-# desktop needs a working `op`. The catch (learned the hard way, ADR-0017): the
+# 1Password CLI — a desktop needs a working `op` once, at first apply, when
+# run_once_before_fetch-age-key pulls the age identity from 1Password (ADR-0022),
+# and thereafter only to edit 1Password-stored secrets. The catch (learned the
+# hard way, ADR-0017): the
 # desktop-app integration only trusts an `op` binary that is root-owned and setgid
 # to the `onepassword-cli` group. The app verifies the connecting CLI's *client
 # type* by that group via SO_PEERCRED — a user-owned binary is rejected with

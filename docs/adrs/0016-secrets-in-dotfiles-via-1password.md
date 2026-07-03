@@ -1,11 +1,11 @@
 ---
 title: ADR-0016 — Secret-bearing dotfiles via 1Password
-status: accepted
+status: superseded
 created: 2026-06-16
-updated: 2026-06-16
+updated: 2026-07-03
 tags: [chezmoi, secrets, 1password, ssh, dotfiles]
 supersedes: null
-superseded-by: null
+superseded-by: "0022"
 ---
 
 # ADR-0016: Secret-bearing dotfiles via 1Password

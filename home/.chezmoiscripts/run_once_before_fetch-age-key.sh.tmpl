@@ -1,0 +1,29 @@
+#!/bin/sh
+# Fetch this machine's age identity from 1Password — the key that decrypts the
+# repo's encrypted dotfiles (the SSH host list, ADR-0022). run_once_before_:
+# runs before any file is applied (so the key exists by the time chezmoi
+# decrypts) and never re-runs after it succeeds. Desktops only — servers render
+# the gated block empty (their encrypted targets are ignored via .chezmoiignore,
+# so they never need the key or `op`). This is the ONE place `op` is needed at
+# converge time; status/diff/apply are 1Password-free once the key is in place.
+# If the key file is ever lost, re-fetch it by hand with the same `op document
+# get` below (run_once won't fire again).
+set -eu
+{{ if ne .profile "server" -}}
+key="$HOME/.config/chezmoi/key.txt"
+if [ ! -f "$key" ]; then
+	if ! command -v op >/dev/null 2>&1; then
+		echo "myplace: the 1Password CLI (op) is needed once, to fetch the age key." >&2
+		echo "myplace: install it and sign in (macOS: brew install --cask 1password-cli," >&2
+		echo "myplace: Linux desktop: re-run apply after the provision script installs it)." >&2
+		exit 1
+	fi
+	echo "myplace: fetching age key from 1Password (one-time)" >&2
+	umask 077
+	mkdir -p "$HOME/.config/chezmoi"
+	# --account: required on machines signed into more than one 1Password
+	# account (same reason as everywhere else in this setup); harmless when
+	# only the personal account is present.
+	op document get "chezmoi age key" --vault Private --account my.1password.com > "$key"
+fi
+{{ end -}}

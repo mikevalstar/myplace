@@ -30,7 +30,7 @@ The update screen presents drift grouped into the four buckets below; the user c
    Then commit and push captured changes: `chezmoi git -- add -A`, `chezmoi git -- commit` (message prompt with sensible default), `chezmoi git -- push`.
 
    **Known limitation — templated files:** `chezmoi re-add` cannot reverse a rendered file back into a `.tmpl` source, so for a templated managed file (e.g. the mise config) it silently leaves the template unchanged and the edit is *not* captured. The capture flow detects this (the file is still modified after re-add) and tells the user to edit the source template directly (`chezmoi edit <file>`) and commit in the source repo. Doing so is the correct way to change a templated dotfile and preserves its conditionals. Smarter handling (offering `chezmoi edit`, or diffing into the template) is future work.
-2. **Pull incoming dotfiles.** `chezmoi git -- pull --rebase` updates the source repo without touching target files. Rebase keeps just-captured local commits on top.
+2. **Pull incoming dotfiles.** `chezmoi git -- pull --rebase` updates the source repo without touching target files. Rebase keeps just-captured local commits on top. Then `chezmoi init` (no apply) regenerates the machine-local `~/.config/chezmoi/chezmoi.toml` from the just-pulled `.chezmoi.toml.tmpl`, so a config-template change (e.g. [ADR-0022](../adrs/0022-age-encrypted-dotfiles.md)'s `[age]` encryption section) is in effect before the apply that needs it — `prompt*Once` answers are reused, so it never prompts. The TUI's update path gets the same via `chezmoi update --init`.
 3. **Review and apply incoming dotfiles.** Before applying, the step checks for managed files that still have local edits (any the user skipped, or — in headless runs — all of them, since capture never runs there). If any remain, the apply is **skipped, not attempted**: a bare `chezmoi apply` would prompt to overwrite them and, with no TTY, abort with a cryptic error. Instead the step reports `not applied — local edits to <files>; <how to resolve>` and the rest of the update (tools) proceeds. The files stay as drift for an interactive `myplace update` to keep or discard.
 
    In an interactive run, after the pull and before any apply, `myplace` walks every file where `chezmoi status` says apply would change the target. For each file it shows `chezmoi diff <target>` and asks:
@@ -57,6 +57,7 @@ Decision points worth noting:
   "schema": 1,
   "steps": [
     { "name": "chezmoi pull", "ok": true },
+    { "name": "chezmoi init", "ok": true },
     { "name": "chezmoi apply", "ok": true },
     { "name": "mise install", "ok": true },
     { "name": "mise upgrade", "ok": false, "error": "node: download failed" }

@@ -7,6 +7,17 @@
 {{- $gitName := promptStringOnce . "gitName" "gitName" "Mike Valstar" -}}
 {{- $gitEmail := promptStringOnce . "gitEmail" "gitEmail" "mike@valstar.dev" -}}
 
+{{/* age encryption for secret-bearing dotfiles (ADR-0022). The identity is a
+     per-fleet key fetched once from 1Password by run_once_before_fetch-age-key;
+     the recipient is its public half (not secret). Configured on every profile —
+     servers never decrypt anything (.chezmoiignore takes the encrypted targets
+     out of scope there), so a missing key file is harmless on them. */}}
+encryption = "age"
+
+[age]
+    identity = "{{ .chezmoi.homeDir }}/.config/chezmoi/key.txt"
+    recipient = "age1ph0y4eyan8l6lwg2dkjtzj7l52z5nrsz0g0qdqvrpc4e3znctgnqwyz4fa"
+
 [data]
     profile = {{ $profile | quote }}
     gitName = {{ $gitName | quote }}

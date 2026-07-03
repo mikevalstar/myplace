@@ -1,21 +1,20 @@
-{{/* ~/.ssh/config — managed by myplace. See ADR-0016 and the managed-setup guide.
+{{/* ~/.ssh/config — managed by myplace. See ADR-0022 and the managed-setup guide.
 
-  The full, host-bearing config (server IPs etc.) is NOT in this public repo: it
-  lives in a 1Password Document and is pulled at apply time. Only macs get it;
-  servers render just the non-secret global defaults below.
+  The full, host-bearing config (server IPs etc.) is NOT committed in plaintext:
+  it lives age-encrypted in this repo (private_config.d/encrypted_private_hosts.age)
+  and is decrypted at apply time with the machine's age key
+  (~/.config/chezmoi/key.txt, fetched once from 1Password by
+  run_once_before_fetch-age-key.sh). Desktops get it via the Include below;
+  servers render just the non-secret global defaults — the encrypted file is out
+  of scope for them entirely (.chezmoiignore), so they never need the key.
 
-  To edit the host list: open the "ssh config" Document in 1Password (Private
-  vault) and edit it there — do not paste hosts into this repo. To change the
-  shared defaults every machine gets, edit the `Host *` block in this file.
-
-  onepasswordDocument args: "<item title or uuid>" "<vault>" "<account>". The
-  account (a 1Password sign-in address) is required so `op` can disambiguate when
-  a machine is signed into more than one account — the Document lives in the
-  personal account, which every non-server mac must be signed into to read it.
-  Adjust if you store it elsewhere. Requires an authenticated `op` (1Password
-  CLI) on macs. */ -}}
+  To edit the host list: decrypt → edit → re-encrypt with chezmoi; never paste a
+  host block into this file. Recipe: docs/workflows/edit-ssh-config.md. To change
+  the shared defaults every machine gets, edit the `Host *` block below. */ -}}
 {{- if ne .profile "server" }}
-{{ onepasswordDocument "ssh config" "Private" "my.1password.com" -}}
+# Host list (secret; age-decrypted to ~/.ssh/config.d/hosts — desktops only).
+# Must precede Host * — ssh keeps the first value it obtains for an option.
+Include config.d/hosts
 {{ end }}
 # --- global defaults (managed by myplace; every machine) ---
 Host *

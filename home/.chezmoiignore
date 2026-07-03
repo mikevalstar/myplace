@@ -6,3 +6,11 @@
 # our pinned versions, so committing it just makes every machine that opens nvim
 # show as drifted. Let each machine own its own lock.
 .config/nvim/lazy-lock.json
+
+{{ if eq .profile "server" -}}
+# Servers don't get the SSH host list, so the age-encrypted file that carries it
+# is out of scope there — which is also what lets servers skip the age key (and
+# 1Password) entirely: chezmoi never decrypts an ignored entry (ADR-0022).
+.ssh/config.d
+.ssh/config.d/**
+{{ end -}}

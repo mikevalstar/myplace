@@ -1,83 +1,84 @@
 ---
-title: Edit the SSH config (hosts in 1Password)
+title: Edit the SSH config (hosts age-encrypted in the repo)
 status: active
 created: 2026-06-16
-updated: 2026-06-16
-tags: [ssh, 1password, chezmoi, dotfiles, how-to]
+updated: 2026-07-03
+tags: [ssh, age, chezmoi, dotfiles, secrets, how-to]
 actors: [user, chezmoi]
 ---
 
-# Edit the SSH config (hosts in 1Password)
+# Edit the SSH config (hosts age-encrypted in the repo)
 
 ## Goal
 
 Add or change an SSH host (e.g. a new server's IP) without ever putting that IP
-into the public git repo.
+into the public git repo **in plaintext**.
 
 ## Preconditions
 
-- 1Password app installed with **Settings → Developer → "Integrate with 1Password
-  CLI"** enabled, and the `op` CLI on PATH (provisioning installs it on macs).
-- The `ssh config` Document exists in the `Private` vault (the source of truth for
-  the host list). See [ADR-0016](../adrs/0016-secrets-in-dotfiles-via-1password.md).
+- The machine's age key at `~/.config/chezmoi/key.txt` — any desktop that has
+  applied this setup has it (fetched once from 1Password at first apply —
+  [ADR-0022](../adrs/0022-age-encrypted-dotfiles.md)).
+- A clone of this repo: host edits are commits under `home/`, rolled out by
+  push + `myplace update` like any other dotfile change.
 
 ## Background — what is the source of truth
 
-`~/.ssh/config` is **rendered**, not edited by hand: chezmoi pulls your host
-blocks from the 1Password Document and appends the non-secret global `Host *`
-defaults from `home/private_dot_ssh/private_config.tmpl`. So:
+`~/.ssh/config` is **rendered**, not edited by hand. Two pieces make it up:
 
-- **Host entries / IPs** → live in the **1Password Document** (edit there).
-- **Shared defaults** (keepalives, `UseKeychain`, …) → live in the **template**.
-- Editing `~/.ssh/config` directly is pointless — it's overwritten on the next
-  apply and shows as drift until then.
+- **Host entries / IPs** → `~/.ssh/config.d/hosts`, decrypted at apply time
+  from the age ciphertext committed at
+  `home/private_dot_ssh/private_config.d/encrypted_private_hosts.age`. That
+  encrypted file is the source of truth — edit it via the recipe below.
+- **Shared defaults** (keepalives, `UseKeychain`, …) → the `Host *` block in
+  `home/private_dot_ssh/private_config.tmpl` (not secret; edit normally).
+- Editing `~/.ssh/config` or `~/.ssh/config.d/hosts` directly is pointless —
+  both are overwritten on the next apply and show as drift until then.
 
-The Document holds only your `Host …` blocks; do **not** put the global `Host *`
-block in it (the template adds that).
+The encrypted file holds only `Host …` blocks; do **not** put the global
+`Host *` block in it (the template adds that, after the Include).
 
 ## Steps
 
-### Option A — 1Password app (simplest, no temp file)
-
-1. Open the **`ssh config`** Document in the 1Password app and edit it there.
-2. Regenerate the local file: `chezmoi apply ~/.ssh/config`
-   (or a full `myplace update` if you also want to pull/converge everything else).
-
-### Option B — CLI (edit a local copy, push back, apply)
+From a checkout of this repo (`chezmoi encrypt`/`decrypt` use the machine's
+own key + recipient from `~/.config/chezmoi/chezmoi.toml`, so there's nothing
+to pass):
 
 ```sh
-# 1. pull the current host list to a temp file
-#    (--account disambiguates if more than one account is signed in; drop it otherwise)
-op document get "ssh config" --vault Private --account my.1password.com > "$HOME/.sshconfig.edit"
+hosts=home/private_dot_ssh/private_config.d/encrypted_private_hosts.age
 
-# 2. edit it — add/adjust Host blocks only (not the global Host * block)
-"${EDITOR:-nano}" "$HOME/.sshconfig.edit"
+# 1. decrypt to a private temp file (0600 via umask)
+(umask 077; chezmoi decrypt "$hosts" > "${TMPDIR:-/tmp}/hosts.edit")
 
-# 3. push the new contents back into 1Password
-op document edit "ssh config" "$HOME/.sshconfig.edit" --vault Private --account my.1password.com
+# 2. edit — Host blocks only (no global Host * block)
+"${EDITOR:-nano}" "${TMPDIR:-/tmp}/hosts.edit"
 
-# 4. remove the local copy (it contains your IPs)
-rm -f "$HOME/.sshconfig.edit"
+# 3. re-encrypt into the repo and remove the plaintext
+chezmoi encrypt "${TMPDIR:-/tmp}/hosts.edit" > "$hosts"
+rm -f "${TMPDIR:-/tmp}/hosts.edit"
 
-# 5. regenerate ~/.ssh/config from the updated Document
-chezmoi apply ~/.ssh/config        # or: myplace update
+# 4. commit + push (to main — that's what machines pull), then converge
+git add "$hosts" && git commit -m "Update SSH host list" && git push
+myplace update        # on this machine; others pick it up on their next update
 ```
 
 ## Outcome
 
-`~/.ssh/config` is regenerated with the new host(s) plus the global defaults; the
-IPs live only in 1Password. The git repo is untouched — no commit or push needed,
-because nothing in `home/` changed (only the Document did).
+Every desktop's `~/.ssh/config.d/hosts` regenerates with the new host(s) on its
+next update; the repo carries only armored age ciphertext. Unlike the old
+1Password-Document flow (ADR-0016), the change is an ordinary commit — visible
+in history, rolled out by the normal update path.
 
 ## Failure modes
 
 | What can go wrong | How you find out | Recovery |
 |-------------------|------------------|----------|
-| `op` locked / not signed in | `chezmoi apply` errors with `op signin` | Unlock 1Password (or the app integration toggle), retry |
-| Global `Host *` accidentally added to the Document | duplicate `Host *` in rendered file | Remove it from the Document; defaults belong in the template |
-| Edited `~/.ssh/config` directly | shows as drift in `myplace status`; lost on next apply | Move the change into the Document (hosts) or template (defaults) |
+| Age key missing on this machine | `chezmoi decrypt` errors (`no identity`) | `op document get "chezmoi age key" --vault Private --account my.1password.com > ~/.config/chezmoi/key.txt` then `chmod 600` it |
+| Re-encrypted without actually changing anything | git shows a diff every time (age output is randomized) | `git checkout -- <file>` — only commit ciphertext when the plaintext changed |
+| Plaintext committed by accident | IPs visible in the public repo | Treat them as leaked: rotate/replace the exposed hosts' addresses; force-pushing history out of a public repo doesn't un-leak it |
+| Edited `~/.ssh/config` or `config.d/hosts` directly | shows as drift in `myplace status`; lost on next apply | Move the change into the encrypted file (hosts) or template (defaults) |
 
 ## Related
 
-- [ADR-0016 — Secret-bearing dotfiles via 1Password](../adrs/0016-secrets-in-dotfiles-via-1password.md)
+- [ADR-0022 — Age-encrypted dotfiles with a 1Password-held key](../adrs/0022-age-encrypted-dotfiles.md)
 - [Extending the managed setup](../guides/managed-setup.md) (the "secret-bearing dotfile" section)
