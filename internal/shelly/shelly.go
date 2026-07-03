@@ -1,12 +1,14 @@
-// Package shelly wraps the Shelly CLI (CachyOS's Rust-based all-in-one package
+// Package shelly wraps the Shelly CLI (Arch/CachyOS's all-in-one package
 // helper) for read-only inventory. Like internal/brew it is present-if-installed:
 // callers check Installed first and skip Shelly entirely when it is not on PATH,
 // so this package is safe to wire up on every OS (it self-reports unavailable on
 // macOS/servers). It never installs, upgrades, syncs, or otherwise mutates
-// anything — it only reads the available-updates list across every channel Shelly
-// manages (native Arch repos, AUR, Flatpak, AppImage). The adapter that turns
-// this into an outdated.Source lives in internal/outdated, so this package stays
-// a thin CLI wrapper with no cross-imports (ADR-0010).
+// anything — it only reads the available-updates list. `shelly check-updates`
+// covers native Arch repos by default; the AUR and Flatpak channels are opt-in
+// per invocation (`-a`/`-l`), which we pass so a single call reports all three.
+// (AppImage has no check-updates flag, so it is out of scope here.) The adapter
+// that turns this into an outdated.Source lives in internal/outdated, so this
+// package stays a thin CLI wrapper with no cross-imports (ADR-0010).
 package shelly
 
 import (
@@ -14,7 +16,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/mikevalstar/myplace/internal/run"
 )
@@ -41,88 +42,90 @@ type Package struct {
 	Latest  string
 }
 
-// ParseOutdated parses `shelly check-updates --json`, the all-channel update
-// check (native repos + AUR + Flatpak + AppImage).
+// shellyDoc is the confirmed shape of `shelly check-updates -a -l --json`
+// (captured from Shelly 2.4.1 on CachyOS). It is an object with a MetaData
+// header and one array per channel; the repo/AUR entries carry Name + Version
+// (the available/new version) + OldVersion (currently installed), while Flatpak
+// entries carry Id + Name + Version and have no old-version field.
+type shellyDoc struct {
+	Packages []shellyEntry `json:"Packages"` // native Arch repos
+	Aur      []shellyEntry `json:"Aur"`
+	Flatpak  []shellyEntry `json:"Flatpak"`
+}
+
+type shellyEntry struct {
+	Name       string `json:"Name"`
+	ID         string `json:"Id"`         // Flatpak app id; empty for repo/AUR
+	Version    string `json:"Version"`    // the available/new version
+	OldVersion string `json:"OldVersion"` // installed version; empty for Flatpak
+}
+
+// ParseOutdated parses `shelly check-updates -a -l --json` (native repos + AUR +
+// Flatpak). Shelly prints a human "Checking for updates..." line before the JSON
+// body on stdout, so we skip to the first `{`/`[` rather than assuming the buffer
+// starts with JSON.
 //
-// NOTE: Shelly post-dates this code's authoring and can't run on a Mac, so the
-// exact JSON shape below is inferred from the documented CLI, not captured from
-// the tool. It MUST be confirmed against real output on a CachyOS machine — see
-// docs/features/outdated-packages.md. To that end the parser is deliberately
-// tolerant: it accepts either a bare array of entries or an object wrapping one
-// under `updates`/`packages`/`results`, and reads several field-name aliases for
-// the package name and its current/new versions. If the real shape differs, the
-// fix is confined to the key lists here (and this package's test fixtures).
-//
-// Packages from a secondary channel (AUR, Flatpak, AppImage) are prefixed with
-// that channel (e.g. `flatpak:org.gimp.GIMP`) so they stay distinguishable once
-// every channel is flattened into the single "shelly" source row; native repo
-// packages keep their bare name (as pacman shows them). Entries with no name or
-// no current version are skipped (mirrors brew/mise's empty-current skip).
+// Packages from a secondary channel (AUR, Flatpak) are prefixed with that channel
+// (e.g. `flatpak:org.gimp.GIMP`) so they stay distinguishable once every channel
+// is flattened into the single "shelly" source row; native repo packages keep
+// their bare name (as pacman shows them). An entry is kept when it has a name and
+// an available version; Flatpak carries no installed version, so — unlike the
+// brew/mise empty-current skip — a blank Current does not drop it (the row still
+// tells you an update is waiting).
 func ParseOutdated(out []byte) ([]Package, error) {
 	trimmed := bytes.TrimSpace(out)
 	if len(trimmed) == 0 {
 		return nil, nil
 	}
+	i := bytes.IndexByte(trimmed, '{')
+	if i < 0 {
+		// Non-empty output with no JSON object at all (e.g. an error message):
+		// don't silently report "nothing outdated".
+		return nil, fmt.Errorf("shelly: no JSON object in output: %q", firstLine(trimmed))
+	}
+	body := trimmed[i:]
 
-	var entries []map[string]any
-	switch trimmed[0] {
-	case '[':
-		if err := json.Unmarshal(trimmed, &entries); err != nil {
-			return nil, err
-		}
-	case '{':
-		var wrapper map[string]json.RawMessage
-		if err := json.Unmarshal(trimmed, &wrapper); err != nil {
-			return nil, err
-		}
-		for _, key := range []string{"updates", "packages", "results"} {
-			if raw, ok := wrapper[key]; ok {
-				if err := json.Unmarshal(raw, &entries); err != nil {
-					return nil, err
-				}
-				break
-			}
-		}
-		// No known array key (e.g. an object carrying only a count) → no packages.
-	default:
-		return nil, fmt.Errorf("shelly: unexpected JSON (want object or array), got %q", trimmed[0])
+	var doc shellyDoc
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return nil, err
 	}
 
 	var pkgs []Package
-	for _, e := range entries {
-		name := firstString(e, "name", "pkg", "package")
-		cur := firstString(e, "current_version", "current", "installed_version", "installed", "old_version")
-		latest := firstString(e, "new_version", "new", "latest", "available_version", "available")
-		if name == "" || cur == "" {
-			continue
+	add := func(entries []shellyEntry, prefix string) {
+		for _, e := range entries {
+			name := e.Name
+			if name == "" {
+				name = e.ID // Flatpak entries may only carry an id
+			}
+			if name == "" || e.Version == "" {
+				continue
+			}
+			pkgs = append(pkgs, Package{Name: prefix + name, Current: e.OldVersion, Latest: e.Version})
 		}
-		switch channel := strings.ToLower(firstString(e, "source", "channel", "type", "repository", "repo")); channel {
-		case "aur", "flatpak", "appimage":
-			name = channel + ":" + name
-		}
-		pkgs = append(pkgs, Package{Name: name, Current: cur, Latest: latest})
 	}
+	add(doc.Packages, "")
+	add(doc.Aur, "aur:")
+	add(doc.Flatpak, "flatpak:")
 	return pkgs, nil
 }
 
-// firstString returns the first non-empty string value among the given keys.
-func firstString(e map[string]any, keys ...string) string {
-	for _, k := range keys {
-		if v, ok := e[k].(string); ok && v != "" {
-			return v
-		}
+// firstLine returns the first line of b, for use in error messages.
+func firstLine(b []byte) string {
+	if i := bytes.IndexByte(b, '\n'); i >= 0 {
+		return string(b[:i])
 	}
-	return ""
+	return string(b)
 }
 
-// Outdated returns every package with a newer version available, across all
-// channels Shelly manages. It reads only — it never runs `shelly sync`/`update`/
+// Outdated returns every package with a newer version available across the repo,
+// AUR, and Flatpak channels. `-a`/`-l` opt the AUR and Flatpak channels into the
+// otherwise repo-only check. It reads only — it never runs `shelly sync`/`update`/
 // `upgrade`, so freshness reflects the user's last sync (same read-only stance as
 // brew.Outdated, which never runs `brew update`). Shelly may exit non-zero while
 // still emitting valid JSON, so a non-empty body is trusted even on error (same
 // tolerance as brew/mise).
 func (c *Client) Outdated(ctx context.Context) ([]Package, error) {
-	out, err := c.r.Run(ctx, "", "shelly", "check-updates", "--json")
+	out, err := c.r.Run(ctx, "", "shelly", "check-updates", "-a", "-l", "--json")
 	if err != nil && len(out) == 0 {
 		return nil, err
 	}

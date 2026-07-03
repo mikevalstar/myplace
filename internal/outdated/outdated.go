@@ -157,8 +157,9 @@ type shellySource struct{ c *shelly.Client }
 
 // ShellySource adapts a Shelly client (CachyOS). Like brew it's present-if-
 // installed: Available() gates the shell-out, so Shelly is silently skipped when
-// it isn't on PATH (i.e. everywhere but a CachyOS box). One row aggregates every
-// channel Shelly manages — native repos, AUR, Flatpak, AppImage (ADR-0010).
+// it isn't on PATH (i.e. everywhere but an Arch/CachyOS box). One row aggregates
+// the channels `shelly check-updates -a -l` reports — native repos, AUR, Flatpak
+// (ADR-0010).
 func ShellySource(c *shelly.Client) Source { return shellySource{c} }
 
 func (s shellySource) Name() string                       { return "shelly" }
