@@ -261,6 +261,13 @@ fi
 # fleet; on macOS it comes from brew-if-present here instead (ADR-0008).
 [ "$(uname -s)" = "Darwin" ] && ensure_tool btop btop
 
+# Apple's `container` — run Linux containers in lightweight VMs (a daemon-free
+# Docker/Podman alternative). Apple Silicon + macOS 26+ only, so arch-gate it; it's
+# a brew *formula*, not a cask (ADR-0008). Intel/older-macOS/Linux all skip it (the
+# arm64 gate plus brew's own macOS-26 floor, both failure-tolerant). Start the VM
+# service manually after install: `container system start`. GUI is Orchard below.
+[ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ] && ensure_tool container container
+
 # --- 1Password CLI (macOS-only cask; the Linux servers don't get the secret SSH
 # config that needs it — ADR-0016). `op` is what chezmoi's onepasswordDocument
 # shells out to when rendering ~/.ssh/config on desktops; enable the app's
@@ -273,6 +280,11 @@ ensure_cask font-monaspace-nf
 ensure_cask font-symbols-only-nerd-font
 ensure_cask font-jetbrains-mono-nerd-font
 ensure_cask font-fira-code-nerd-font
+
+# --- Orchard: native GUI for Apple's `container` (live per-container CPU/mem/net,
+# image management). macOS 26+ cask; ensure_cask is macOS-only already and brew's
+# own macOS-26 requirement self-limits older Macs, so no extra arch gate needed. ---
+ensure_cask orchard
 {{ if and (eq .chezmoi.os "linux") (ne .profile "server") -}}
 
 # --- Linux desktop extras (personal-linux): 1Password CLI + Nerd Fonts (ADR-0017) ---
