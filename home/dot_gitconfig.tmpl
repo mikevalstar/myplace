@@ -82,3 +82,15 @@
 [tag]
 	gpgsign = true
 {{- end }}
+
+# git-lfs — large-file filters, the block `git lfs install` writes globally.
+# Captured here (fleet-wide, ungated) so a machine that runs it doesn't drift
+# from the template the moment it does. The filters only engage in repos whose
+# .gitattributes route paths through LFS; on a machine without git-lfs such a
+# clone fails loudly (required=true) instead of silently materializing pointer
+# stubs — install git-lfs there if that ever bites.
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
