@@ -6,6 +6,8 @@
 
 A future phase adds a central server that machines ping, so the status of every system can be tracked from one place. Keep that in mind when designing, but don't build for it prematurely.
 
+**Fleet inventory:** on Mike's personal Mac laptop, per-machine records (specs, roles, IPs, access notes for every computer he owns) live in the Obsidian vault at `~/Documents/Valstar/Hobbies/Computers/` — start at `Computer Fleet.md`. Useful context when a task involves "the tower", "the beelink", or other fleet machines.
+
 ## Documentation-first
 
 This project is documentation-first. **Before implementing a feature or making an architectural choice, write (or update) the relevant doc:**
