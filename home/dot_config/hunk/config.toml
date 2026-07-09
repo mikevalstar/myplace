@@ -1,0 +1,7 @@
+# hunk (TUI diff viewer) config — managed by myplace (chezmoi), edit in the repo.
+# Docs: https://github.com/modem-dev/hunk (Config section).
+#
+# Catppuccin Mocha is built in, so pin it to match the fleet theme
+# (bat/delta/ghostty/alacritty/atuin/zed). hunk's "auto" is no good here: it
+# only picks between github-light/github-dark, never the Catppuccin variants.
+theme = "catppuccin-mocha"
