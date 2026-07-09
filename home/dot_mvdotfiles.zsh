@@ -46,6 +46,29 @@ fi
 
 fi  # end interactive-only block
 
+## hunk (TUI diff viewer) — the inverse gate: defined for agent/CI shells only.
+## hunk doesn't fail fast without a terminal; a bare `hunk diff` in an agent
+## shell hangs until the agent's command timeout (the zoxide class of problem —
+## correctness, not noise). Pass through the non-TUI subcommands (sessions/
+## skill/daemon are how an agent is *meant* to drive hunk) and turn the TUI
+## launchers into a note + help text. Humans never get this function;
+## `command hunk` bypasses it. See docs/guides/agent-friendly-shell.md.
+if [[ "${MYPLACE_INTERACTIVE_SHELL:-1}" == 0 ]]; then
+  hunk() {
+    case "${1:-}" in
+      skill|session|daemon|-h|--help|-v|--version)
+        command hunk "$@"
+        ;;
+      *)
+        echo "hunk: TUI launch suppressed — agent/CI shell with no terminal to draw on (headless hunk hangs until timeout)." >&2
+        echo "hunk: for diff text use \`git diff\`/\`jj diff\`; to drive a human's live hunk session use \`hunk session\` (skill: \`hunk skill path\`); \`command hunk\` forces the real binary." >&2
+        command hunk --help
+        return 1
+        ;;
+    esac
+  }
+fi
+
 ## FZF
 # $HOME 
 export FZF_COMPLETION_TRIGGER='~~'
