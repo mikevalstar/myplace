@@ -24,8 +24,28 @@ import (
 // (exit 2), the documented "e.g. offline" case.
 const statusTimeout = 2 * time.Minute
 
-// interactive reports whether a human is plausibly at the keyboard.
+// agentEnvVars mirrors the gate in the managed .zshrc (see
+// docs/guides/agent-friendly-shell.md): coding agents that run commands in a
+// real PTY (a herdr agent pane, Cursor's terminal) pass the TTY test, so a
+// TTY alone doesn't prove a human is present.
+var agentEnvVars = []string{"CLAUDECODE", "AI_AGENT", "CURSOR_AGENT", "CODEX_SANDBOX", "OPENCODE"}
+
+// agentShell reports whether a known coding-agent env var is set.
+func agentShell() bool {
+	for _, v := range agentEnvVars {
+		if os.Getenv(v) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// interactive reports whether a human is plausibly at the keyboard: both
+// stdio ends are TTYs and no known coding-agent env var is set.
 func interactive() bool {
+	if agentShell() {
+		return false
+	}
 	return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 }
 

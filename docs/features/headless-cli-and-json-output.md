@@ -2,7 +2,7 @@
 title: Headless CLI with JSON output
 status: accepted
 created: 2026-06-12
-updated: 2026-06-13
+updated: 2026-07-09
 tags: [cli, json, headless, automation]
 phase: 1
 ---
@@ -59,6 +59,8 @@ The same person is both audiences: at a Mac, you want the TUI; across twelve ser
 ### Non-interactive rule
 
 If a headless invocation reaches a point that would require a prompt (a conflict choice, a missing flag, a git credential), it **fails fast with a descriptive error and exit code 3** — it never hangs waiting for input that cron/SSH will never provide. The error names the flag or interactive flow that resolves it.
+
+**How "interactive" is decided:** a human is assumed present only when stdin *and* stdout are TTYs **and** no known coding-agent env var is set (`CLAUDECODE`, `AI_AGENT`, `CURSOR_AGENT`, `CODEX_SANDBOX`, `OPENCODE` — the same list the managed `.zshrc` gates on, see the [agent-friendly shell guide](../guides/agent-friendly-shell.md)). The env-var half matters because some agents run commands in a real PTY (a herdr agent pane, Cursor's terminal): a TTY alone would let bare `myplace` launch the dashboard and hang the agent.
 
 ### Exit codes
 

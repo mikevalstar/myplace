@@ -148,6 +148,11 @@ var present."
 Live implementation: [home/dot_zshrc](../../home/dot_zshrc) and
 [home/dot_mvdotfiles.zsh](../../home/dot_mvdotfiles.zsh).
 
+myplace itself applies the same env-var list in its `interactive()` gate
+(`cmd/myplace/status.go`): bare `myplace`, `update`, and `bootstrap` treat an
+agent-var shell as non-interactive even when it has a real PTY (a herdr agent
+pane, Cursor's terminal), so the dashboard/wizard never opens under an agent.
+
 ## Gotchas
 
 - **The rc runs even though `$-` has no `i`.** Don't assume a non-interactive

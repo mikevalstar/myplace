@@ -105,7 +105,7 @@ func newRootCmd(r run.Runner, ch *chezmoi.Client, ms *mise.Client) *cobra.Comman
 			annHeadless:    "myplace status --json",
 			annExitCodes:   exitCodesDrift,
 			annInteractive: "true",
-			annNote:        "bare `myplace` with a TTY launches the dashboard; off a TTY (agent or pipe) it prints the status summary and exits with the drift code. Prefer `myplace status --json`.",
+			annNote:        "bare `myplace` launches the dashboard only for a human: off a TTY, or when a coding-agent env var (CLAUDECODE, AI_AGENT, CURSOR_AGENT, CODEX_SANDBOX, OPENCODE) is set, it prints the status summary and exits with the drift code. Prefer `myplace status --json`.",
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
