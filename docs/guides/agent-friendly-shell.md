@@ -2,7 +2,7 @@
 title: Agent-friendly shell init
 status: active
 created: 2026-06-13
-updated: 2026-07-09
+updated: 2026-07-10
 tags: [shell, zsh, agents, dotfiles]
 audience: both
 ---
@@ -81,46 +81,24 @@ fi
 Send the "not found" fallbacks to **stderr** so they never land in captured
 stdout: `echo "zoxide not found, and not setup" >&2`.
 
-### TUI-only tools: intercept, don't just skip
+### TUI-only tools: don't wrap agent-aware ones
 
-The gates above make tooling *absent* for agents. A TUI binary (hunk is the
-worked example) needs the opposite treatment: the binary must stay on `PATH`,
-but launching it headless doesn't fail fast — it hangs until the agent's
-command timeout. That's the zoxide class of problem (correctness, not noise),
-so the fix is an **interception wrapper** defined only for agent shells — the
-inverse gate, `== 0`:
+We briefly shipped an agent-shell `hunk()` wrapper that intercepted hunk's
+TUI-launching subcommands (headless hunk hangs until the agent's command
+timeout rather than failing fast) and passed through an allowlist
+(`session`/`skill`/`daemon`). **Reverted.** hunk is agent-aware by design —
+agents driving a human's live session is a supported, documented workflow —
+so a wrapper that second-guesses which subcommands an agent may run breaks
+legitimate use and goes stale as hunk's agent surface grows. The accepted
+trade-off: an agent that launches a TUI-style hunk command headless hangs
+until its own timeout. The durable fix is upstream — hunk detecting a
+non-interactive/agent context itself and degrading — which is being pushed
+with modem-dev/hunk.
 
-```zsh
-if [[ "${MYPLACE_INTERACTIVE_SHELL:-1}" == 0 ]]; then
-  hunk() {
-    case "${1:-}" in
-      skill|session|daemon|-h|--help|-v|--version)
-        command hunk "$@" ;;                # non-TUI, agent-useful: pass through
-      *)
-        echo "hunk: TUI launch suppressed — ..." >&2   # why, to stderr
-        command hunk --help                            # something useful, to stdout
-        return 1 ;;                         # honest: no review actually opened
-    esac
-  }
-fi
-```
-
-Two design points:
-
-- **Allowlist the pass-throughs, intercept by default.** hunk is agent-aware —
-  `hunk session`, `hunk skill path`, and `hunk daemon` are precisely how an
-  agent is *supposed* to drive a human's live hunk session, so those (plus
-  `--help`/`--version`) go through to the real binary. Everything else — the
-  TUI launchers (`diff`, `show`, `patch`, `pager`, `difftool`, …) and any
-  future subcommand — gets the note + help. Defaulting the unknown to
-  "intercept" means a new TUI subcommand can't reintroduce the hang.
-- **Return non-zero from the intercepted branch.** The requested review did
-  not open; exiting 0 would tell a script it did.
-
-Limitation: a shell function only guards `PATH`-style invocations — `mise exec
-hunk -- hunk diff` or the binary's absolute path sidestep it. The durable fix
-is upstream (fail fast when there's no TTY); the wrapper is the fleet-level
-mitigation.
+The lesson generalizes: shadow a binary only when it has **no** legitimate
+agent surface (zoxide's `cd` override is the canonical case, handled above by
+never initializing it). For a tool agents are meant to talk to, leave the
+binary alone and push interactivity detection upstream.
 
 ### The guard, decoded
 
