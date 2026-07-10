@@ -36,6 +36,9 @@ miller = "latest"
 yq = "latest"   # YAML/TOML/XML query+edit — the jq-shaped tool for the non-JSON configs
 sd = "latest"   # find-and-replace; saner regex/replace than sed (sharkdp-adjacent)
 fx = "latest"   # interactive JSON viewer — pairs with jq for exploring --json output
+ast-grep = "latest"  # syntax-aware code search and structural rewrites
+actionlint = "latest" # GitHub Actions workflow validation
+hyperfine = "latest"  # command-line benchmarking
 # tlrc: the official tldr-pages client (binary `tldr`). Chosen over tealdeer
 # because tealdeer isn't in mise's registry (cargo-only, like tokei) whereas
 # tlrc ships prebuilt binaries here. Its config lives at ~/.config/tlrc/.
@@ -51,6 +54,10 @@ bun = "latest"
 # btop's only mise backend (aqua) ships linux binaries only; macOS gets it via
 # brew in run_onchange_provision.sh (ADR-0008).
 btop = "latest"
+{{ end -}}
+{{ if ne .profile "server" -}}
+# Interactive analytics database for desktop development and data inspection.
+duckdb = "latest"
 {{ end -}}
 
 [settings]
