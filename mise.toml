@@ -15,3 +15,7 @@ description = "Run all tests"
 [tasks.vet]
 run = "go vet ./..."
 description = "Static analysis"
+
+[tasks.vuln]
+run = "go run golang.org/x/vuln/cmd/govulncheck@latest ./..."
+description = "Scan dependencies for known vulnerabilities"
