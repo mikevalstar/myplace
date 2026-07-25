@@ -1,14 +1,16 @@
 ---
 title: ADR-0023 — Managing AI agent skills (own via chezmoi, third-party via skills.sh)
-status: accepted
+status: superseded
 created: 2026-07-03
-updated: 2026-07-03
+updated: 2026-07-11
 tags: [skills, ai, claude-code, chezmoi, outdated, provisioning, cli]
 supersedes: null
-superseded-by: null
+superseded-by: "0024"
 ---
 
 # ADR-0023: Managing AI agent skills
+
+> **Superseded by [ADR-0024](0024-skills-management-as-separate-project.md).** In practice the orchestrate-the-skills.sh-CLI + chezmoi + informational-only approach below wasn't robust enough — it has no per-project story, no bidirectional reconcile/diff, and leaned on a CLI whose global store can't be restored (#683). A robust design turned out to be a whole application in its own right, so skills management is being spun out into a **separate project, skilloom**, that myplace will orchestrate as an external tool (like chezmoi/mise) rather than contain. The `internal/skills` + `outdated.SkillsSource` code from this ADR stays as an interim stopgap until skilloom lands. This record is kept for the history and the tool facts it documents.
 
 ## Context
 

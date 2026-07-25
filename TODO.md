@@ -7,14 +7,16 @@ ready to build; check it off (or delete it) when done.
 
 ## ⏳ Waiting on others (external, blocked)
 
-- [ ] **Migrate global skills to a tool-managed lockfile.** Today the third-party
-  global skill stable is self-managed as a `skills add -g` source list in the
-  provision script, because the skills.sh CLI can't restore a *global* stable from
-  its lock (`experimental_install` is project-only). Switch to a committed
-  `~/.agents/.skill-lock.json` (minus its volatile timestamp/UI fields) driven by a
-  real restore command once it exists.
-  Blocked on **[vercel-labs/skills#683](https://github.com/vercel-labs/skills/issues/683)**.
-  See [ADR-0023](docs/adrs/0023-managing-ai-skills.md).
+- [ ] **Integrate `skilloom` once it's written.** Skills management has been spun
+  out of myplace into a **separate project, skilloom** ([ADR-0024](docs/adrs/0024-skills-management-as-separate-project.md),
+  supersedes ADR-0023) — myplace will orchestrate it as an external tool (install
+  via the setup, optionally surface its status informationally), not build a skills
+  engine itself. Blocked on skilloom being written. When it lands: add it to the
+  managed setup (INVENTORY, mise baseline / provision, README), decide how myplace
+  surfaces its status, and retire/re-point the interim skills.sh `outdated` source.
+  The old skills.sh-CLI lockfile-migration plan (blocked on
+  [vercel-labs/skills#683](https://github.com/vercel-labs/skills/issues/683)) is
+  **superseded** by this — skilloom owns the reproducibility story now.
 
 ## 🔎 Investigate / spikes
 
@@ -25,12 +27,11 @@ ready to build; check it off (or delete it) when done.
 
 ## 🛠️ Planned features
 
-- [ ] **Skill reviewer in myplace** — a command/TUI view to add, remove, and manage
-  **global** AI skills (list installed, add from a repo, remove, and drive updates)
-  on top of the skills.sh CLI — the interactive/management counterpart to the
-  read-only `outdated` skills source shipped in [ADR-0023](docs/adrs/0023-managing-ai-skills.md).
-  Write a feature spec (and confirm the CLI's non-interactive `add`/`remove -g`
-  surface) before building.
+- [ ] ~~**Skill reviewer in myplace**~~ — **moved out of myplace.** Interactive
+  skill management (add/remove/reconcile, global + per-project, multi-agent) is now
+  its own project, **skilloom** ([ADR-0024](docs/adrs/0024-skills-management-as-separate-project.md)).
+  myplace's only future skills work is *orchestrating* skilloom (see the waiting item
+  above), not building the reviewer itself.
 - [ ] **`update --on-local-edits=keep|discard|skip`** — a headless resolution for
   local edits, the flag pattern [ADR-0006](docs/adrs/0006-agent-runnable-commands.md)
   itself names. Today local-edit drift can only be resolved at a TTY; an agent
