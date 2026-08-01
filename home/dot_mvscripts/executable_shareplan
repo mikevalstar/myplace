@@ -1,0 +1,284 @@
+#!/usr/bin/env bash
+# shareplan — publish raw HTML plans to share.valstar.dev.
+# mv_scripts: publish or update an HTML plan on share.valstar.dev
+#
+# Managed by myplace (chezmoi) — edit at home/dot_mvscripts/executable_shareplan
+# in the repo, not at ~/.mvscripts/shareplan. See docs/adrs/0014.
+
+set -euo pipefail
+
+readonly BASE_URL="https://share.valstar.dev"
+readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/shareplan"
+readonly KEY_FILE="$CONFIG_DIR/key"
+
+show_help() {
+  local renderer=cat
+  if command -v gum >/dev/null 2>&1 && [ -t 1 ]; then renderer="gum format"; fi
+  $renderer <<'EOF'
+# shareplan
+
+Publish a raw HTML plan to share.valstar.dev, or replace a plan while keeping
+its existing public URL. HTML can come from one file argument or standard input.
+
+## Usage
+
+    shareplan auth
+    shareplan help
+    shareplan plan.html
+    cat plan.html | shareplan
+    shareplan --update Ab3def4Gh5jk plan.html
+    cat plan.html | shareplan --update Ab3def4Gh5jk
+
+`--update` also accepts the canonical update URL printed after a create:
+
+    shareplan --update https://share.valstar.dev/api/plans/Ab3def4Gh5jk.html plan.html
+
+## Authentication
+
+`shareplan auth` prompts for the shared key without echoing it, then stores it at
+`${XDG_CONFIG_HOME:-$HOME/.config}/shareplan/key` (directory 0700, file 0600).
+The `SHAREIT_PLAN_KEY` environment variable takes precedence when set and is
+useful for ephemeral or automated runs. The key is never printed.
+
+## Options
+
+    -u, --update SLUG   replace an existing plan by slug or canonical update URL
+    -h, --help          show this help
+
+## Exit codes
+
+    0   plan created or updated
+    1   authentication, input, dependency, network, or API failure
+    2   usage error
+    3   authentication prompt cancelled or unavailable
+EOF
+}
+
+usage_error() {
+  echo "shareplan: $1" >&2
+  echo "try: shareplan --help" >&2
+  exit 2
+}
+
+save_auth() {
+  [ $# -eq 0 ] || usage_error "auth takes no arguments"
+  if [ ! -t 0 ]; then
+    echo "shareplan: auth requires an interactive terminal." >&2
+    exit 3
+  fi
+
+  local key=""
+  if command -v gum >/dev/null 2>&1; then
+    key=$(gum input --password --prompt "Share key: ") || {
+      echo "shareplan: authentication cancelled." >&2
+      exit 3
+    }
+  else
+    printf 'Share key: ' >&2
+    IFS= read -r -s key || {
+      printf '\n' >&2
+      echo "shareplan: authentication cancelled." >&2
+      exit 3
+    }
+    printf '\n' >&2
+  fi
+
+  [ -n "$key" ] || {
+    echo "shareplan: key cannot be empty." >&2
+    exit 3
+  }
+
+  umask 077
+  mkdir -p "$CONFIG_DIR"
+  chmod 700 "$CONFIG_DIR"
+  local pending="$CONFIG_DIR/.key.$$"
+  trap 'rm -f "$pending"' RETURN
+  printf '%s\n' "$key" >"$pending"
+  chmod 600 "$pending"
+  mv -f "$pending" "$KEY_FILE"
+  trap - RETURN
+  echo "shareplan: key saved to $KEY_FILE"
+}
+
+load_key() {
+  if [ -n "${SHAREIT_PLAN_KEY:-}" ]; then
+    printf '%s' "$SHAREIT_PLAN_KEY"
+    return
+  fi
+  if [ -r "$KEY_FILE" ]; then
+    local key=""
+    IFS= read -r key <"$KEY_FILE" || true
+    if [ -n "$key" ]; then
+      printf '%s' "$key"
+      return
+    fi
+  fi
+  echo "shareplan: no key found; run 'shareplan auth' or set SHAREIT_PLAN_KEY." >&2
+  return 1
+}
+
+normalize_slug() {
+  local value="$1"
+  case "$value" in
+    "$BASE_URL/api/plans/"*.html)
+      value=${value#"$BASE_URL/api/plans/"}
+      value=${value%.html}
+      ;;
+    http://*|https://*|*/*)
+      return 1
+      ;;
+    *.html)
+      value=${value%.html}
+      ;;
+  esac
+  [[ "$value" =~ ^[A-Za-z0-9]+$ ]] || return 1
+  printf '%s' "$value"
+}
+
+if [ "${1:-}" = "auth" ]; then
+  shift
+  save_auth "$@"
+  exit 0
+fi
+
+if [ "${1:-}" = "help" ]; then
+  [ $# -eq 1 ] || usage_error "help takes no arguments"
+  show_help
+  exit 0
+fi
+
+update_target=""
+input_file=""
+input_temp=""
+response_file=""
+cleanup() {
+  [ -z "$input_temp" ] || rm -f "$input_temp"
+  [ -z "$response_file" ] || rm -f "$response_file"
+}
+trap cleanup EXIT
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -u|--update)
+      [ $# -ge 2 ] || usage_error "$1 requires a slug or update URL"
+      [ -z "$update_target" ] || usage_error "--update may only be supplied once"
+      update_target="$2"
+      shift 2
+      ;;
+    --update=*)
+      [ -z "$update_target" ] || usage_error "--update may only be supplied once"
+      update_target=${1#*=}
+      [ -n "$update_target" ] || usage_error "--update requires a slug or update URL"
+      shift
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    --)
+      shift
+      [ $# -le 1 ] || usage_error "expected one HTML file"
+      if [ $# -eq 1 ]; then input_file="$1"; fi
+      break
+      ;;
+    -*) usage_error "unknown option: $1" ;;
+    *)
+      [ -z "$input_file" ] || usage_error "expected one HTML file"
+      input_file="$1"
+      shift
+      ;;
+  esac
+done
+
+command -v curl >/dev/null 2>&1 || {
+  echo "shareplan: curl is required." >&2
+  exit 1
+}
+command -v jq >/dev/null 2>&1 || {
+  echo "shareplan: jq is required." >&2
+  exit 1
+}
+
+if [ -n "$input_file" ]; then
+  [ -f "$input_file" ] || {
+    echo "shareplan: no such file: $input_file" >&2
+    exit 1
+  }
+  [ -r "$input_file" ] || {
+    echo "shareplan: file is not readable: $input_file" >&2
+    exit 1
+  }
+  [ -s "$input_file" ] || {
+    echo "shareplan: file is empty: $input_file" >&2
+    exit 1
+  }
+  data_source="@$input_file"
+else
+  [ ! -t 0 ] || usage_error "provide an HTML file or pipe HTML on standard input"
+  input_temp=$(mktemp "${TMPDIR:-/tmp}/shareplan-input.XXXXXX")
+  cat >"$input_temp"
+  [ -s "$input_temp" ] || usage_error "provide a non-empty HTML file or pipe HTML on standard input"
+  data_source="@$input_temp"
+fi
+
+key=$(load_key) || exit 1
+method="POST"
+endpoint="$BASE_URL/api/plans"
+expected_status="201"
+slug=""
+if [ -n "$update_target" ]; then
+  slug=$(normalize_slug "$update_target") || usage_error \
+    "update target must be a slug or a canonical $BASE_URL update URL"
+  method="PUT"
+  endpoint="$BASE_URL/api/plans/$slug.html"
+  expected_status="200"
+fi
+
+response_file=$(mktemp "${TMPDIR:-/tmp}/shareplan-response.XXXXXX")
+
+if ! http_status=$(curl --silent --show-error \
+  --output "$response_file" \
+  --write-out '%{http_code}' \
+  --request "$method" \
+  --header "X-Share-Key: $key" \
+  --header 'Content-Type: text/html; charset=utf-8' \
+  --data-binary "$data_source" \
+  "$endpoint"); then
+  echo "shareplan: request failed." >&2
+  exit 1
+fi
+
+if [ "$http_status" != "$expected_status" ]; then
+  api_error=$(jq -r 'if type == "object" and (.error | type == "string") then .error else empty end' \
+    "$response_file" 2>/dev/null || true)
+  if [ -n "$api_error" ]; then
+    echo "shareplan: API error (HTTP $http_status): $api_error" >&2
+  else
+    echo "shareplan: API error (HTTP $http_status)." >&2
+  fi
+  exit 1
+fi
+
+if ! jq -e 'type == "object" and (.slug | type == "string") and (.url | type == "string")' \
+  "$response_file" >/dev/null 2>&1; then
+  echo "shareplan: API returned an invalid success response." >&2
+  exit 1
+fi
+
+slug=$(jq -r '.slug' "$response_file")
+public_url=$(jq -r '.url' "$response_file")
+
+if [ "$method" = "POST" ]; then
+  echo "Plan published: $public_url"
+else
+  echo "Plan updated: $public_url"
+fi
+echo "Slug: $slug"
+echo
+echo "Update this plan later with:"
+if [ -n "$input_file" ]; then
+  printf '  shareplan --update %q %q\n' "$slug" "$input_file"
+else
+  printf '  shareplan --update %q plan.html\n' "$slug"
+  printf '  cat plan.html | shareplan --update %q\n' "$slug"
+fi

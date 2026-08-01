@@ -2,7 +2,7 @@
 title: Managed machine inventory
 status: active
 created: 2026-07-09
-updated: 2026-07-09
+updated: 2026-08-01
 tags: [inventory, provisioning, dotfiles, mise, chezmoi]
 ---
 
@@ -113,12 +113,14 @@ The following scripts are deployed to `~/.mvscripts` and placed on `PATH`. Run `
 | `pubip` | Print the machine's public IP |
 | `repos` | Summarize repositories under `~/projects` |
 | `serve-this` | Serve the current directory locally |
+| `shareplan` | Publish or update raw HTML plans on `share.valstar.dev` |
 | `whichver` | Display installed toolchain versions |
 
 ## Secrets and intentional machine-local state
 
 - Secret-bearing files are committed as age ciphertext. The current encrypted asset is the desktop SSH host list.
 - The fleet age identity lives at `~/.config/chezmoi/key.txt`; it is fetched from 1Password when missing or empty and is never committed.
+- The `shareplan` API key lives at `${XDG_CONFIG_HOME:-$HOME/.config}/shareplan/key`, is created with owner-only permissions by `shareplan auth`, and is never managed by chezmoi.
 - Servers ignore `.ssh/config.d`, so they do not decrypt the host list or need the age key or 1Password CLI.
 - Neovim's `lazy-lock.json`, herdr's plugin registry, caches, logs, histories, and application-generated state remain machine-local.
 - myplace logs live under `$XDG_STATE_HOME/myplace`, not in the managed config tree.

@@ -69,6 +69,22 @@ Narrow an update to one half with `myplace update --dotfiles` (pull + apply only
 
 `myplace sysinfo` reports what the machine *is* — OS and version plus base specs (host model, CPU, GPU, memory, disk) and a couple of extras (battery, local IP), via [fastfetch](https://github.com/fastfetch-cli/fastfetch) (installed as part of the managed tool set). It's informational and read-only, with `--json` for scripts; the dashboard shows the same facts in a compact header band.
 
+### Share HTML plans
+
+The managed `shareplan` helper publishes an HTML plan from a file or pipeline and
+prints both its public URL and the command needed to replace it later:
+
+```sh
+shareplan auth                                      # hidden key prompt; run once per machine
+shareplan plan.html                                 # create
+cat plan.html | shareplan                           # create from stdin
+shareplan --update Ab3def4Gh5jk plan.html           # update by returned slug
+```
+
+`SHAREIT_PLAN_KEY` can supply the key without storing it. See
+[the share HTML plans spec](docs/features/share-html-plans.md) or run
+`shareplan --help` for the full interface.
+
 ## Where things live
 
 After install + a bootstrap, this is what lands where. Paths honor the XDG base dirs and assume the defaults; everything is under `$HOME`, nothing requires root.
@@ -79,6 +95,8 @@ After install + a bootstrap, this is what lands where. Paths honor the XDG base 
 | `~/.local/share/chezmoi/` | chezmoi's **source clone** of this repo — the copy `myplace update` does `git pull` + apply on. The dotfiles live under its `home/` subdir (selected by [`.chezmoiroot`](home/)). Edit + push the repo, not the applied files. |
 | `~/.zshrc`, `~/.mvdotfiles.zsh`, `~/.gitconfig` | Dotfiles applied into `$HOME` from the source state. Editing these directly shows up as drift. |
 | `~/.config/mise/config.toml` | This machine's global mise tool set, rendered from `home/dot_config/mise/config.toml.tmpl`. |
+| `~/.mvscripts/shareplan` | Managed helper for publishing raw HTML plans to `share.valstar.dev`; run `shareplan --help` for file, pipeline, auth, and update examples. |
+| `~/.config/shareplan/key` | Machine-local `shareplan` API key created by `shareplan auth` with mode `0600`; never managed by chezmoi. Honors `XDG_CONFIG_HOME`. |
 | `~/.ssh/config` | Rendered (desktops only — `personal-mac`/`work-mac`/`personal-linux`, not servers): non-secret global defaults from the template, plus an `Include` of `~/.ssh/config.d/hosts` — the host list, committed **age-encrypted** and decrypted locally at apply time, so server IPs never sit in this public repo in plaintext ([ADR-0022](docs/adrs/0022-age-encrypted-dotfiles.md)). The decryption key is fetched from 1Password automatically whenever it's missing or empty — normally just once, at first apply — and after that no `op` is needed day-to-day. Edit hosts via the encrypted file, not here — see below. |
 | `~/.local/state/myplace/myplace.log` | Debug log (see below). Honors `XDG_STATE_HOME`; override with `MYPLACE_STATE_DIR`. Deliberately outside `~/.config` so it never lands in your dotfiles. |
 | `~/.oh-my-zsh`, `~/.cargo` + `~/.rustup`, `~/.local/share/fnm` | Installed by the provision script — oh-my-zsh, rustup (Rust), and fnm (Node): the things mise can't own ([ADR-0007](docs/adrs/0007-provisioning-mechanism.md)). |
