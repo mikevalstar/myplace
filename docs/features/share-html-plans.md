@@ -32,8 +32,10 @@ command for updating that same plan later.
 - `shareplan FILE` and `cat FILE | shareplan` create a plan with `POST /api/plans`.
 - `shareplan help` and `shareplan --help` expose the complete usage contract.
 - `shareplan --update SLUG FILE` and its stdin equivalent replace a plan with
-  `PUT /api/plans/<slug>.html`. The canonical API update URL returned by create
-  is also accepted in place of `SLUG`.
+  `PUT /api/plans/<slug>.html`. The public plan URL printed by create
+  (`https://share.valstar.dev/p/<slug>.html`) and the canonical API update URL
+  (`https://share.valstar.dev/api/plans/<slug>.html`) are both accepted in place
+  of `SLUG`.
 - Uploads use `Content-Type: text/html; charset=utf-8`, send the key in
   `X-Share-Key`, and pass the body to curl with `--data-binary`.
 - Successful output includes the public URL, slug, and a ready-to-copy update
@@ -68,7 +70,8 @@ cat plan.html | shareplan --update Ab3def4Gh5jk
 
 The command fails before making a request when no key or non-empty HTML input is
 available, a file is unreadable, or an update target is not a simple slug or a
-canonical `https://share.valstar.dev/api/plans/<slug>.html` URL. In particular,
+`https://share.valstar.dev` plan URL (`/p/<slug>.html` or
+`/api/plans/<slug>.html`). In particular,
 an agent shell whose standard input is a non-TTY but has no bytes must not create
 an empty plan when the agent runs bare `shareplan` while discovering the tool.
 

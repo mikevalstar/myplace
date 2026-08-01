@@ -29,8 +29,10 @@ its existing public URL. HTML can come from one file argument or standard input.
     shareplan --update Ab3def4Gh5jk plan.html
     cat plan.html | shareplan --update Ab3def4Gh5jk
 
-`--update` also accepts the canonical update URL printed after a create:
+`--update` also accepts the public plan URL printed after a create, or the
+canonical API update URL:
 
+    shareplan --update https://share.valstar.dev/p/Ab3def4Gh5jk.html plan.html
     shareplan --update https://share.valstar.dev/api/plans/Ab3def4Gh5jk.html plan.html
 
 ## Authentication
@@ -42,7 +44,8 @@ useful for ephemeral or automated runs. The key is never printed.
 
 ## Options
 
-    -u, --update SLUG   replace an existing plan by slug or canonical update URL
+    -u, --update SLUG   replace an existing plan by slug, public plan URL, or
+                        canonical API update URL
     -h, --help          show this help
 
 ## Exit codes
@@ -120,6 +123,10 @@ load_key() {
 normalize_slug() {
   local value="$1"
   case "$value" in
+    "$BASE_URL/p/"*.html)
+      value=${value#"$BASE_URL/p/"}
+      value=${value%.html}
+      ;;
     "$BASE_URL/api/plans/"*.html)
       value=${value#"$BASE_URL/api/plans/"}
       value=${value%.html}
@@ -228,7 +235,7 @@ expected_status="201"
 slug=""
 if [ -n "$update_target" ]; then
   slug=$(normalize_slug "$update_target") || usage_error \
-    "update target must be a slug or a canonical $BASE_URL update URL"
+    "update target must be a slug or a $BASE_URL plan URL"
   method="PUT"
   endpoint="$BASE_URL/api/plans/$slug.html"
   expected_status="200"
