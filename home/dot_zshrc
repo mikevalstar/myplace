@@ -77,3 +77,6 @@ alias kennyloggins="claude --dangerously-skip-permissions"
 
 # Antigravity CLI
 [ -d "$HOME/.local/bin" ] && export PATH="$HOME/.local/bin:$PATH"
+
+# Windsurf CLI (installed by Devin)
+[ -d "$HOME/.codeium/windsurf/bin" ] && export PATH="$HOME/.codeium/windsurf/bin:$PATH"

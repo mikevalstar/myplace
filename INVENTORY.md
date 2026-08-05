@@ -127,7 +127,7 @@ The following scripts are deployed to `~/.mvscripts` and placed on `PATH`. Run `
 
 ## Present only when installed separately
 
-Shell PATH wiring recognizes `opencode`, Google Cloud SDK, MiniMax Code, and Antigravity CLI, but myplace does not install them. Homebrew itself is also never installed. Node versions remain fnm-managed, and Neovim plugins are fetched by LazyVim on first use.
+Shell PATH wiring recognizes `opencode`, Google Cloud SDK, MiniMax Code, Antigravity CLI, and the Windsurf CLI, but myplace does not install them. Homebrew itself is also never installed. Node versions remain fnm-managed, and Neovim plugins are fetched by LazyVim on first use.
 
 Managed Claude skills and a reproducible third-party AI-skill set are documented future work; there is currently no `home/dot_claude/` tree or skills installation loop to inventory.
 
