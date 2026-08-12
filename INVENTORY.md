@@ -2,7 +2,7 @@
 title: Managed machine inventory
 status: active
 created: 2026-07-09
-updated: 2026-08-01
+updated: 2026-08-12
 tags: [inventory, provisioning, dotfiles, mise, chezmoi]
 ---
 
@@ -93,6 +93,7 @@ Desktop machines need 1Password only to fetch a missing or empty age identity du
 | `~/.config/tlrc/config.toml` | `tldr` client settings |
 | `~/.config/gh/config.yml` | GitHub CLI settings |
 | `~/.config/mise/config.toml` | The global fleet tool declaration |
+| `~/.claude/CLAUDE.md` | Fleet-wide Claude Code preferences: coding and TypeScript conventions, documentation-first practice, tooling defaults, and how the agent should engage. Only this file is managed; the rest of `~/.claude` (settings, sessions, caches, plugins) stays machine-local |
 
 Machine identity and behavior are recorded as chezmoi data during bootstrap: profile, Git name, Git email, and whether the machine normally pushes shared changes.
 
@@ -129,7 +130,7 @@ The following scripts are deployed to `~/.mvscripts` and placed on `PATH`. Run `
 
 Shell PATH wiring recognizes `opencode`, Google Cloud SDK, MiniMax Code, Antigravity CLI, and the Windsurf CLI, but myplace does not install them. Homebrew itself is also never installed. Node versions remain fnm-managed, and Neovim plugins are fetched by LazyVim on first use.
 
-Managed Claude skills and a reproducible third-party AI-skill set are documented future work; there is currently no `home/dot_claude/` tree or skills installation loop to inventory.
+The `home/dot_claude/` tree currently carries only `CLAUDE.md`, the fleet-wide Claude Code preference file. Managed Claude skills and a reproducible third-party AI-skill set remain documented future work; there is no skills installation loop to inventory yet.
 
 ## Keeping this inventory current
 

@@ -2,7 +2,7 @@
 title: Extending the managed setup (tools & dotfiles)
 status: active
 created: 2026-06-13
-updated: 2026-07-03
+updated: 2026-08-12
 tags: [chezmoi, mise, dotfiles, provisioning, skills, how-to]
 audience: both
 ---
@@ -24,6 +24,7 @@ Where things live and how to add a new tool, dotfile, or provisioning step so it
 | `dot_gitconfig.tmpl` | `~/.gitconfig` — identity (name/email from `.gitName`/`.gitEmail`), modern defaults, and SSH commit signing auto-enabled when a key exists ([ADR-0015](../adrs/0015-git-defaults-and-ssh-commit-signing.md)) |
 | `dot_config/git/allowed_signers.tmpl` | `~/.config/git/allowed_signers` — generated `<email> <pubkey>` so local signature verification works; empty (and signing off) on a keyless machine |
 | `dot_mvdotfiles.zsh` | Personal shell config (`~/.mvdotfiles.zsh`) sourced by `.zshrc`: tool inits, aliases, functions |
+| `dot_claude/CLAUDE.md` | `~/.claude/CLAUDE.md` — fleet-wide Claude Code preferences (coding style, documentation-first practice, tooling, agent posture). Only this one file is managed; chezmoi leaves the rest of `~/.claude` (settings, sessions, plugins, caches) machine-local |
 | `dot_nanorc.tmpl` | The managed `~/.nanorc` — GNU nano syntax highlighting (includes the bundled syntax files, path templated per OS/arch) + editor niceties |
 | `private_dot_ssh/private_config.tmpl` | `~/.ssh/config` — non-secret global `Host *` defaults for every machine; on non-`server` profiles (every desktop, Mac or `personal-linux`) it also `Include`s `~/.ssh/config.d/hosts`, the full host list (with IPs) decrypted at apply time from the age ciphertext committed at `private_dot_ssh/private_config.d/encrypted_private_hosts.age` — so the secrets never appear in this public repo in plaintext ([ADR-0022](../adrs/0022-age-encrypted-dotfiles.md), [ADR-0017](../adrs/0017-linux-desktop-profile.md)) |
 | `.chezmoi.toml.tmpl` | Init prompts → chezmoi data: `profile`, `push`, plus `gitName`/`gitEmail` (answered at install, pre-fillable with `--promptString`). Optional `signingKey` (no prompt; `dig`-defaulted) overrides the commit-signing key path |
