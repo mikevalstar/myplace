@@ -50,6 +50,10 @@ tlrc = "latest"
 # bun: JS/TS runtime used as a runner for some managed scripts (ADR-0014).
 # This is bun, not Node — Node stays with fnm (ADR-0007).
 bun = "latest"
+# okq: query Markdown-with-frontmatter doc bundles (OKF/Obsidian vaults, this
+# repo's docs/). Not in mise's registry — pulled straight from its GitHub
+# releases, which cover darwin/linux × amd64/arm64.
+"github:mikevalstar/okq" = "latest"
 {{ if eq .chezmoi.os "linux" -}}
 # btop's only mise backend (aqua) ships linux binaries only; macOS gets it via
 # brew in run_onchange_provision.sh (ADR-0008).

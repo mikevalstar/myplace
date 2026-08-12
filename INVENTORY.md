@@ -30,13 +30,13 @@ On a new machine, `install.sh` installs the `myplace` binary into `~/.local/bin`
 | Area | Tools |
 |---|---|
 | Search and navigation | `ripgrep`, `fd`, `fzf`, `zoxide`, `eza` |
-| Data and text | `jq`, `yq`, `miller`, `sd`, `fx`, `bat`, `glow`, `tlrc` (`tldr`) |
+| Data and text | `jq`, `yq`, `miller`, `sd`, `fx`, `bat`, `glow`, `tlrc` (`tldr`), `okq` |
 | Shell and prompts | `starship`, `atuin`, `gum` |
 | Git and change review | `gh`, `delta`, `hunk`, `jj`, `lazygit`, `git-lfs`, `actionlint` |
 | Development and automation | `pnpm`, `bun`, `d2`, `ast-grep`, `hyperfine` |
 | System and terminal | `herdr`, `fastfetch` |
 
-Linux also gets `btop` from mise. macOS gets `btop` through Homebrew when Homebrew is available. Desktop profiles also get `duckdb`; servers omit it.
+Linux also gets `btop` from mise. macOS gets `btop` through Homebrew when Homebrew is available. Desktop profiles also get `duckdb`; servers omit it. `okq` is not in mise's registry and is installed from its GitHub releases through mise's `github:` backend.
 
 ### Managed outside mise
 
@@ -75,7 +75,7 @@ Desktop machines need 1Password only to fetch a missing or empty age identity du
 | `~/.zshrc` and `~/.mvdotfiles.zsh` | oh-my-zsh plugins, PATHs, mise/fnm/rustup activation, agent-safe shell behavior, Starship, zoxide, fzf, Atuin, aliases, functions, and editor defaults |
 | `~/.gitconfig` | Per-machine identity, delta pager, modern pull/push/fetch/rebase defaults, rerere, Git LFS filters, and automatic SSH signing when a public key exists |
 | `~/.config/git/allowed_signers` and `ignore` | Local SSH signature verification and global ignore rules |
-| `~/.ssh/config` | Shared secure defaults and OS-specific options |
+| `~/.ssh/config` | Shared secure defaults, OS-specific options, and the colima VM include on macOS |
 | `~/.ssh/config.d/hosts` | Age-encrypted fleet host list on desktop profiles only |
 | `~/.ssh/authorized_keys` | Shared authorized public keys |
 | `~/.config/nvim` | LazyVim-based Neovim configuration, keymaps, options, autocmds, and colorscheme |

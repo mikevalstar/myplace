@@ -16,6 +16,13 @@
 # Must precede Host * — ssh keeps the first value it obtains for an option.
 Include config.d/hosts
 {{ end }}
+{{- if eq .chezmoi.os "darwin" }}
+# colima writes its own VM host block and appends this Include to ~/.ssh/config
+# on start; carrying it here keeps colima from re-editing a managed file (and
+# apply from reverting it). Missing files are ignored by ssh, so a Mac without
+# colima is unaffected.
+Include ~/.colima/ssh_config
+{{ end }}
 # --- global defaults (managed by myplace; every machine) ---
 Host *
     AddKeysToAgent yes
