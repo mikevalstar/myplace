@@ -1,6 +1,6 @@
 module github.com/mikevalstar/myplace
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/catppuccin/go v0.3.0
