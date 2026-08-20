@@ -12,7 +12,7 @@ Target machines: personal Macs, a work Mac, a personal Linux desktop, and assort
 
 This repo is a monorepo: the Go app, the chezmoi dotfiles (under [home/](home/), via `.chezmoiroot`), and the machines' mise config all live here — one clone carries everything ([ADR-0003](docs/adrs/0003-monorepo-app-dotfiles-mise.md)).
 
-> 🚧 **v0.** Bootstrap, status (TUI + `--json`), update with interactive capture of local edits and per-file incoming diff review, profile push policy, outdated-package inventory (mise + brew + shelly + AI skills, TUI + `--json`), system info (`sysinfo`, TUI band + `--json`), preflight diagnostics (`doctor`, + `--json`), `self-update`, and self-describing help (`help --llm`/`--json`) all work. Not yet built: the phase-2 server.
+> 🚧 **v0.** Bootstrap, status (TUI + `--json`), update with interactive capture of local edits and per-file incoming diff review, profile push policy, outdated-package inventory (mise + brew + shelly + AI skills + cargo, TUI + `--json`), system info (`sysinfo`, TUI band + `--json`), preflight diagnostics (`doctor`, + `--json`), `self-update`, and self-describing help (`help --llm`/`--json`) all work. Not yet built: the phase-2 server.
 
 ## Install
 
@@ -53,7 +53,7 @@ myplace              # TUI dashboard: drift in both directions, r refresh / u up
 myplace update       # capture local edits (keep/discard/skip per file), pull + apply, upgrade tools
 myplace status       # quick plain-text summary, no TUI
 myplace doctor       # preflight: can this machine run myplace? names a remedy for anything wrong
-myplace outdated     # what's upgradable across package managers (mise, brew, shelly, AI skills), read-only
+myplace outdated     # what's upgradable across package managers (mise, brew, shelly, AI skills, cargo), read-only
 myplace sysinfo      # this machine's OS + hardware specs (via fastfetch), read-only
 myplace self-update  # swap this binary for the latest release
 myplace version      # print the version (add --json for a machine-readable document)
@@ -63,7 +63,7 @@ Narrow an update to one half with `myplace update --dotfiles` (pull + apply only
 
 "In sync" is bidirectional: repo changes you haven't applied **and** local edits you haven't pushed both count as drift. Updating always shows you the diff before touching anything.
 
-`myplace outdated` is the cross-manager "what's upgradable here?" view — mise tools, plus (when present) Homebrew packages, Shelly-managed system packages (Arch/CachyOS), and third-party AI skills from the skills.sh CLI, **including software myplace doesn't manage**. It's informational and read-only: it never upgrades anything and never affects the `status` drift verdict. In the dashboard, the "Updates available" pane summarizes it and `o` opens the full list.
+`myplace outdated` is the cross-manager "what's upgradable here?" view — mise tools, plus (when present) Homebrew packages, Shelly-managed system packages (Arch/CachyOS), third-party AI skills from the skills.sh CLI, and Cargo-installed Rust binaries (via `cargo install-update`), **including software myplace doesn't manage**. It's informational and read-only: it never upgrades anything and never affects the `status` drift verdict. In the dashboard, the "Updates available" pane summarizes it and `o` opens the full list.
 
 `myplace doctor` answers a different question than `status`: not "is this machine in sync" but "can myplace run here at all." It's a read-only preflight — chezmoi and mise installed and recent enough, `~/.local/bin` on `PATH`, the dotfiles repo and GitHub API reachable, the state dir writable — and every failure prints the exact remedy. Exit codes follow the headless contract (`0` ready, `1` a check failed, `2` checks incomplete e.g. offline, `3` error), so a provisioning script can gate on `myplace doctor --json` before attempting a bootstrap. Reachability checks degrade to a warning when offline rather than failing — being offline isn't broken.
 

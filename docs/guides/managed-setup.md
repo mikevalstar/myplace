@@ -2,8 +2,8 @@
 title: Extending the managed setup (tools & dotfiles)
 status: active
 created: 2026-06-13
-updated: 2026-08-12
-tags: [chezmoi, mise, dotfiles, provisioning, skills, how-to]
+updated: 2026-08-20
+tags: [chezmoi, mise, dotfiles, provisioning, skills, cargo, how-to]
 audience: both
 ---
 
@@ -19,7 +19,7 @@ Where things live and how to add a new tool, dotfile, or provisioning step so it
 |------|------------|
 | `dot_config/mise/config.toml.tmpl` | The mise tool set — every machine's CLI tools/runtimes from mise's registry |
 | `dot_mvscripts/executable_*` | Helper scripts deployed to a dedicated `~/.mvscripts` (on `PATH`), runnable by name on every machine; `mv_scripts` lists them ([ADR-0014](../adrs/0014-managed-scripts-and-bun-runner.md)) |
-| `.chezmoiscripts/run_onchange_provision.sh.tmpl` | Idempotent installer for the things mise can't own — git, zsh, oh-my-zsh + plugins, rustup, fnm (+ unzip), tokei (cargo build), a current neovim (official static build → `/usr/local` on Linux, brew on macOS), plain OS/brew packages via `ensure_tool` (httpie, mosh, nano), and macOS fonts/GUI casks via `ensure_cask`. A chezmoi template (`.tmpl`) so it can branch on `.profile`: a final block gated to non-`server` Linux installs the Linux **desktop** extras — the `op` CLI, `wl-clipboard` (Wayland copy/paste), and Nerd Fonts into `$HOME` ([ADR-0017](../adrs/0017-linux-desktop-profile.md)) |
+| `.chezmoiscripts/run_onchange_provision.sh.tmpl` | Idempotent installer for the things mise can't own — git, zsh, oh-my-zsh + plugins, rustup, fnm (+ unzip), tokei and cargo-update (cargo builds), a current neovim (official static build → `/usr/local` on Linux, brew on macOS), plain OS/brew packages via `ensure_tool` (httpie, mosh, nano), and macOS fonts/GUI casks via `ensure_cask`. A chezmoi template (`.tmpl`) so it can branch on `.profile`: a final block gated to non-`server` Linux installs the Linux **desktop** extras — the `op` CLI, `wl-clipboard` (Wayland copy/paste), and Nerd Fonts into `$HOME` ([ADR-0017](../adrs/0017-linux-desktop-profile.md)) |
 | `dot_zshrc` | The managed `~/.zshrc` — oh-my-zsh setup, mise activation, tool env wiring |
 | `dot_gitconfig.tmpl` | `~/.gitconfig` — identity (name/email from `.gitName`/`.gitEmail`), modern defaults, and SSH commit signing auto-enabled when a key exists ([ADR-0015](../adrs/0015-git-defaults-and-ssh-commit-signing.md)) |
 | `dot_config/git/allowed_signers.tmpl` | `~/.config/git/allowed_signers` — generated `<email> <pubkey>` so local signature verification works; empty (and signing off) on a keyless machine |
@@ -59,6 +59,10 @@ if ! command -v <tool> >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/<tool>" ]; th
   curl -fsSL <installer> | sh -s -- <non-interactive-flags> || log "<tool> install failed"
 fi
 ```
+
+**A Rust binary that only exists on crates.io** (no prebuilt release, so mise's only backend would be `cargo:`) — build it with rustup's cargo in the provision script instead, never via mise ([ADR-0007](../adrs/0007-provisioning-mechanism.md): Rust is rustup's). `tokei` and `cargo-update` are the two today; follow their blocks — guard on `command -v`, source `$HOME/.cargo/env` (rustup ran with `--no-modify-path`), ensure any build deps first, and `cargo install <crate> --locked || log "…"`. These builds are slow but one-time.
+
+**Keeping those cargo binaries current** is [cargo-update](https://github.com/nabijaczleweli/cargo-update)'s job (`cargo install-update -a`), and myplace surfaces them: the `cargo` source of `myplace outdated` parses `cargo install-update --list` and lists every cargo-installed binary behind crates.io. Read-only like brew and skills — it reports, it never rebuilds ([outdated-packages](../features/outdated-packages.md)).
 
 ### A font or GUI app (desktops only)
 

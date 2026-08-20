@@ -2,7 +2,7 @@
 title: Managed machine inventory
 status: active
 created: 2026-07-09
-updated: 2026-08-12
+updated: 2026-08-20
 tags: [inventory, provisioning, dotfiles, mise, chezmoi]
 ---
 
@@ -46,6 +46,7 @@ The idempotent provision script at `home/.chezmoiscripts/run_onchange_provision.
 - oh-my-zsh with `zsh-autosuggestions` and `zsh-syntax-highlighting`
 - rustup with the stable Rust toolchain
 - `tokei`, built with rustup's Cargo because its current releases are source-only
+- `cargo-update`, built with rustup's Cargo (crates.io-only, no prebuilt release). It provides `cargo install-update`, which keeps the Cargo-installed binaries current and backs the `cargo` source of `myplace outdated`
 - fnm for Node.js version management; Node is not managed by mise
 - `pay-respects`
 - `httpie`, `mosh`, GNU nano, and a current Neovim

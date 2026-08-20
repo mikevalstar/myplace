@@ -16,8 +16,9 @@ func newOutdatedCmd(sources ...outdated.Source) *cobra.Command {
 		Use:   "outdated",
 		Short: "List outdated packages across package managers (read-only, informational)",
 		Long: "Reports packages with a newer version available, grouped by source: mise\n" +
-			"always, brew on Macs, shelly on CachyOS, and skills (AI agent skills via\n" +
-			"the skills.sh CLI) when that CLI is present. Informational and read-only:\n" +
+			"always, brew on Macs, shelly on CachyOS, skills (AI agent skills via the\n" +
+			"skills.sh CLI) when that CLI is present, and cargo (Rust binaries, via\n" +
+			"`cargo install-update`). Informational and read-only:\n" +
 			"it never upgrades anything, and it does NOT affect the drift verdict or\n" +
 			"`status` exit codes. Each present-if-installed source is skipped when its\n" +
 			"CLI isn't resolvable.\n" +
@@ -27,7 +28,7 @@ func newOutdatedCmd(sources ...outdated.Source) *cobra.Command {
 			annExitCodes:    exitCodesOutdated,
 			annOutputSchema: "docs/features/outdated-packages.md",
 			annInteractive:  "false",
-			annNote:         "informational inventory; never mutates and never upgrades. Sources are present-if-installed (brew, shelly, and skills are skipped when their CLI isn't on PATH). Distinct from the drift verdict: 1 means 'updates available', not 'out of sync'.",
+			annNote:         "informational inventory; never mutates and never upgrades. Sources are present-if-installed (brew, shelly, skills, and cargo are skipped when their CLI isn't on PATH). The cargo source polls crates.io, so it is the one source that needs the network; offline it reports a per-source error while the rest still resolve. Distinct from the drift verdict: 1 means 'updates available', not 'out of sync'.",
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			inv := outdated.Collect(cmd.Context(), sources...)

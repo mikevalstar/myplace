@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mikevalstar/myplace/internal/brew"
+	"github.com/mikevalstar/myplace/internal/cargo"
 	"github.com/mikevalstar/myplace/internal/chezmoi"
 	"github.com/mikevalstar/myplace/internal/doctor"
 	"github.com/mikevalstar/myplace/internal/drift"
@@ -82,13 +83,14 @@ func newRootCmd(r run.Runner, ch *chezmoi.Client, ms *mise.Client) *cobra.Comman
 	// Slice order is display order. Each source self-reports Available() == false
 	// when its CLI isn't on PATH, so listing them all is safe everywhere: brew
 	// shows up on Macs, shelly on CachyOS, skills on any box with the skills.sh
-	// CLI, mise anywhere (present-if-installed, ADR-0008/0009/0010/0023). The TUI
+	// CLI, cargo wherever rustup + cargo-update are installed, mise anywhere (present-if-installed, ADR-0008/0009/0010/0023). The TUI
 	// renders whatever's in this slice, so a new source needs no dashboard change.
 	sources := []outdated.Source{
 		outdated.MiseSource(ms),
 		outdated.BrewSource(brew.New(r)),
 		outdated.ShellySource(shelly.New(r)),
 		outdated.SkillsSource(skills.New(r)),
+		outdated.CargoSource(cargo.New(r)),
 	}
 	root := &cobra.Command{
 		Use:   "myplace",

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mikevalstar/myplace/internal/brew"
+	"github.com/mikevalstar/myplace/internal/cargo"
 	"github.com/mikevalstar/myplace/internal/mise"
 	"github.com/mikevalstar/myplace/internal/shelly"
 	"github.com/mikevalstar/myplace/internal/skills"
@@ -31,8 +32,8 @@ type Package struct {
 	Latest  string `json:"latest"`
 }
 
-// Source is a pluggable package manager. Adding apt/npm/cargo/etc. later is one
-// new adapter implementing this interface, registered in the source slice.
+// Source is a pluggable package manager. Adding apt/npm/etc. later is one new
+// adapter implementing this interface, registered in the source slice.
 type Source interface {
 	Name() string
 	Available(ctx context.Context) bool
@@ -189,6 +190,32 @@ func SkillsSource(c *skills.Client) Source { return skillsSource{c} }
 func (s skillsSource) Name() string                       { return "skills" }
 func (s skillsSource) Available(ctx context.Context) bool { return s.c.Installed(ctx) }
 func (s skillsSource) Outdated(ctx context.Context) ([]Package, error) {
+	p, err := s.c.Outdated(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pkgs := make([]Package, 0, len(p))
+	for _, e := range p {
+		pkgs = append(pkgs, Package{Name: e.Name, Current: e.Current, Latest: e.Latest})
+	}
+	return pkgs, nil
+}
+
+type cargoSource struct{ c *cargo.Client }
+
+// CargoSource adapts a cargo-update client. Present-if-installed like brew,
+// shelly, and skills: Available() probes `cargo install-update --version`, so a
+// machine without rustup (or without cargo-update built yet) silently reports
+// unavailable. Covers the Rust binaries in ~/.cargo/bin — invisible to every
+// other source, since Rust is rustup's and not mise's (ADR-0007). Read-only: it
+// runs `--list`, never `-a`. This is the one source that needs the network (it
+// polls crates.io); a slow or offline run lands in this source's Error and
+// leaves the others intact.
+func CargoSource(c *cargo.Client) Source { return cargoSource{c} }
+
+func (s cargoSource) Name() string                       { return "cargo" }
+func (s cargoSource) Available(ctx context.Context) bool { return s.c.Installed(ctx) }
+func (s cargoSource) Outdated(ctx context.Context) ([]Package, error) {
 	p, err := s.c.Outdated(ctx)
 	if err != nil {
 		return nil, err
