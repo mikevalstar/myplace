@@ -2,4 +2,4 @@
 // -ldflags "-X github.com/mikevalstar/myplace/internal/version.Version=...".
 package version
 
-var Version = "0.15.0-dev"
+var Version = "0.16.0-dev"
