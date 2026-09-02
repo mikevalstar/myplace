@@ -1,6 +1,8 @@
 // Package mise wraps the mise CLI. All commands run from the user's home
-// directory so only the GLOBAL config (~/.config/mise/config.toml — managed
-// by chezmoi) applies, never a project-local mise.toml.
+// directory so only the GLOBAL config applies — ~/.config/mise/config.toml
+// (managed by chezmoi; on Omarchy the managed baseline is
+// ~/.config/mise/conf.d/myplace.toml instead and config.toml is the distro's,
+// ADR-0026 — mise merges both) — never a project-local mise.toml.
 package mise
 
 import (

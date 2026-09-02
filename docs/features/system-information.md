@@ -2,7 +2,7 @@
 title: System information (fastfetch-backed)
 status: accepted
 created: 2026-06-16
-updated: 2026-06-16
+updated: 2026-09-02
 tags: [sysinfo, fastfetch, hardware, os, json, tui]
 phase: 1
 ---
@@ -39,7 +39,7 @@ The dashboard tells you whether a machine is *in sync*, but not *which machine* 
 
 `myplace sysinfo` prints a readable multi-line block; `myplace sysinfo --json` emits one JSON document on stdout (logs to stderr, per the [headless contract](headless-cli-and-json-output.md)). It never prompts and never mutates, so it's fully agent-runnable off a TTY.
 
-fastfetch is a read **dependency** installed via the mise baseline (ADR-0013/0007). If it isn't on PATH or fails, the command fails fast naming the dependency (ADR-0006). Load averages aren't a fastfetch module, so they're read separately from `uptime` (best-effort: if `uptime` fails, `load` is simply omitted).
+fastfetch is a read **dependency** installed via the mise baseline (ADR-0013/0007). It is invoked as `fastfetch --config none --format json` — its built-in module set, never the machine's `/etc/fastfetch` or `~/.config/fastfetch` config: a distro-shipped config (Omarchy's) replaces the module list and dropped the `OS`/`LocalIp` entries, which made the parse come back empty ([ADR-0026](../adrs/0026-omarchy-as-os-variant.md)). If it isn't on PATH or fails, the command fails fast naming the dependency (ADR-0006). Load averages aren't a fastfetch module, so they're read separately from `uptime` (best-effort: if `uptime` fails, `load` is simply omitted).
 
 ### Exit codes
 

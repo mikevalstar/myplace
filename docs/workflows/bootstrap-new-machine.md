@@ -2,8 +2,8 @@
 title: Bootstrap a new machine
 status: active
 created: 2026-06-12
-updated: 2026-06-12
-tags: [bootstrap, chezmoi, mise, wizard]
+updated: 2026-09-02
+tags: [bootstrap, chezmoi, mise, wizard, omarchy]
 actors: [user, tui, chezmoi, mise]
 ---
 
@@ -37,6 +37,13 @@ Git is *not* a hard precondition: chezmoi bundles a built-in git sufficient for 
 8. **Verify:** run the [status workflow](check-machine-status.md) and show the resulting dashboard. Offer "register this machine" hook here in phase 2.
 
 Branch: if chezmoi state already exists, the wizard short-circuits to the [update workflow](update-machine.md) with a "this machine is already set up" notice.
+
+Branch: **Omarchy** ([ADR-0026](../adrs/0026-omarchy-as-os-variant.md)). The profile is still `personal-linux`; the templates detect the distro from `/etc/os-release` on their own. What differs is around the apply, not in it:
+
+- *Before step 1:* enable "Integrate with 1Password CLI" in the 1Password app and sign in once — Omarchy ships `op` correctly installed, so the provision script's `op` block no-ops, but the age-key fetch in step 5 needs the app integration on. Back up Omarchy's seeded herdr config (`cp ~/.config/herdr/config.toml ~/.config/herdr/config.toml.omarchy`): the managed one replaces it.
+- *Step 3:* mise is already installed by the distro; only chezmoi lands in `~/.local/bin`.
+- *Step 5:* the apply skips the terminal, Neovim, Starship and bat configs and `~/.config/mise/config.toml` (all Omarchy's) and renders the tool set to `~/.config/mise/conf.d/myplace.toml`. The provision script installs zsh, httpie, mosh, nano via `omarchy pkg add` and rustup via pacman — each is a sudo prompt on a password-sudo desktop; answer them. It leaves the packaged Neovim alone.
+- *After step 8:* `chsh -s /usr/bin/zsh` (one-time, manual — provision never runs `chsh`), and optionally `omarchy font set "FiraCode Nerd Font Mono"`. Don't run Omarchy's `dev-env` installer (it adds Node to mise; Node is fnm's).
 
 ## Outcome
 

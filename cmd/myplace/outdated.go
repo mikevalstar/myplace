@@ -28,7 +28,7 @@ func newOutdatedCmd(sources ...outdated.Source) *cobra.Command {
 			annExitCodes:    exitCodesOutdated,
 			annOutputSchema: "docs/features/outdated-packages.md",
 			annInteractive:  "false",
-			annNote:         "informational inventory; never mutates and never upgrades. Sources are present-if-installed (brew, shelly, skills, and cargo are skipped when their CLI isn't on PATH). The cargo source polls crates.io, so it is the one source that needs the network; offline it reports a per-source error while the rest still resolve. Distinct from the drift verdict: 1 means 'updates available', not 'out of sync'.",
+			annNote:         "informational inventory; never mutates and never upgrades. Sources are present-if-installed (brew, shelly, pacman, skills, and cargo are skipped when their CLI isn't on PATH). The cargo source polls crates.io and the pacman source syncs a temporary package database (checkupdates) and asks the AUR (yay), so those two need the network; offline they report a per-source error while the rest still resolve. Distinct from the drift verdict: 1 means 'updates available', not 'out of sync'.",
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			inv := outdated.Collect(cmd.Context(), sources...)

@@ -25,7 +25,16 @@ pm_install() {
 	elif command -v yum >/dev/null 2>&1; then
 		$sudo yum install -y "$pkg"
 	elif command -v pacman >/dev/null 2>&1; then
-		$sudo pacman -S --noconfirm "$pkg"
+		# Debian-flavoured names the callers use, mapped to Arch's (ADR-0026).
+		case "$pkg" in
+			build-essential) pkg="base-devel" ;;
+		esac
+		if command -v omarchy >/dev/null 2>&1; then
+			# Omarchy's wrapper: pacman -S --needed plus a did-it-land check.
+			omarchy pkg add "$pkg"
+		else
+			$sudo pacman -S --noconfirm --needed "$pkg"
+		fi
 	elif command -v apk >/dev/null 2>&1; then
 		$sudo apk add "$pkg"
 	else
@@ -119,10 +128,24 @@ if [ -d "$HOME/.oh-my-zsh" ]; then
 fi
 
 # --- rustup (stable toolchain; the owner wants rustup, not a mise-pinned rust) ---
+# Arch carries rustup itself in `extra`, so a pacman system gets the package
+# (kept current by the distro) instead of the curl installer (ADR-0026). That
+# package ships the proxies in /usr/bin but NO toolchain and no ~/.cargo/env,
+# hence the `rustup default stable` below and the ~/.cargo/bin PATH line in
+# dot_zshrc.
 if ! command -v rustup >/dev/null 2>&1 && [ ! -x "$HOME/.cargo/bin/rustup" ]; then
-	log "installing rustup (stable)"
-	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path \
-		|| log "rustup install failed"
+	if [ "$(uname -s)" != "Darwin" ] && command -v pacman >/dev/null 2>&1; then
+		log "installing rustup (pacman)"
+		pm_install rustup || log "rustup install failed"
+	else
+		log "installing rustup (stable)"
+		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path \
+			|| log "rustup install failed"
+	fi
+fi
+if command -v rustup >/dev/null 2>&1 && ! rustup show active-toolchain >/dev/null 2>&1; then
+	log "installing the stable Rust toolchain (rustup default stable)"
+	rustup default stable || log "rustup default stable failed"
 fi
 
 # --- tokei (cargo-only upstream; built with rustup's cargo, off mise — ADR-0007) ---
@@ -226,8 +249,27 @@ ensure_tool mosh mosh
 # 24.04 build), so on Linux we install neovim's official static build into
 # /usr/local — a global editor for every user, current, and distro-agnostic.
 # macOS gets a current nvim from brew-if-present. Not in mise: we want it global,
-# not shimmed onto one user's PATH.
-if [ "$(uname -s)" = "Darwin" ]; then
+# not shimmed onto one user's PATH. A distro whose own nvim already clears the
+# floor (Arch/Omarchy ship 0.12.x and keep it current — ADR-0026) is left alone:
+# the static build would only shadow it and re-prompt sudo on every version skew.
+# "Ours" is recognised by its install path, so a machine we did install on keeps
+# getting updates.
+nvim_distro_ok=0
+if [ "$(uname -s)" != "Darwin" ] && command -v nvim >/dev/null 2>&1 \
+	&& [ "$(command -v nvim)" != "/usr/local/bin/nvim" ]; then
+	nvim_ver=$(nvim --version 2>/dev/null | head -1 | awk '{print $2}')
+	nvim_ver=${nvim_ver#v}
+	nvim_major=${nvim_ver%%.*}
+	nvim_rest=${nvim_ver#*.}
+	nvim_minor=${nvim_rest%%.*}
+	case "$nvim_major$nvim_minor" in
+		*[!0-9]*|"") ;; # unparseable: fall through to the managed build
+		*) if [ "$nvim_major" -gt 0 ] || [ "$nvim_minor" -ge 10 ]; then nvim_distro_ok=1; fi ;;
+	esac
+fi
+if [ "$nvim_distro_ok" -eq 1 ]; then
+	: # distro nvim >= 0.10 and not ours; nothing to do
+elif [ "$(uname -s)" = "Darwin" ]; then
 	ensure_tool nvim neovim
 else
 	case "$(uname -m)" in

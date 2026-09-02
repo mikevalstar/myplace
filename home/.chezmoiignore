@@ -14,3 +14,29 @@
 .ssh/config.d
 .ssh/config.d/**
 {{ end -}}
+
+{{/* Omarchy (ADR-0026): the distro owns the themed desktop layer — its terminal,
+     nvim, starship and bat configs import the live theme and get rewritten by
+     `omarchy theme set` / `omarchy font set` / shipped migrations, and its tool
+     launchers `mise use -g` into ~/.config/mise/config.toml on every run. Ours
+     would clobber theirs on first apply and drift forever after. Gate on the
+     os-release id (an OS-variant axis, like darwin vs linux), not the profile:
+     this is still a personal-linux desktop. macOS has no os-release, hence dig. */}}
+{{- if eq (dig "osRelease" "id" "" .chezmoi) "omarchy" }}
+.config/alacritty
+.config/alacritty/**
+.config/ghostty
+.config/ghostty/**
+.config/nvim
+.config/nvim/**
+.config/starship
+.config/starship/**
+.config/bat/config
+# The mise baseline renders to conf.d/myplace.toml here instead (mise merges
+# both files; `mise use -g` only ever writes config.toml, which stays Omarchy's).
+.config/mise/config.toml
+{{- else }}
+# Everywhere else the baseline is config.toml itself; the conf.d twin is Omarchy-only.
+.config/mise/conf.d
+.config/mise/conf.d/**
+{{- end }}

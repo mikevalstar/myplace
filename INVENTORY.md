@@ -2,8 +2,8 @@
 title: Managed machine inventory
 status: active
 created: 2026-07-09
-updated: 2026-08-20
-tags: [inventory, provisioning, dotfiles, mise, chezmoi]
+updated: 2026-09-02
+tags: [inventory, provisioning, dotfiles, mise, chezmoi, omarchy]
 ---
 
 # Managed machine inventory
@@ -14,11 +14,11 @@ For implementation details and instructions for extending the setup, see the [ma
 
 ## Profiles and management layers
 
-The available profiles are `personal-mac`, `work-mac`, `personal-linux`, and `server`. The setup is shared by default; desktop-only assets are excluded from `server`, while OS-specific installation mechanisms are selected independently.
+The available profiles are `personal-mac`, `work-mac`, `personal-linux`, and `server`. The setup is shared by default; desktop-only assets are excluded from `server`, while OS-specific installation mechanisms are selected independently. An [Omarchy](https://omarchy.org/) desktop is a `personal-linux` machine with one more, OS-variant gate (`/etc/os-release` `ID=omarchy`): the distro owns its themed desktop layer, so the entries marked *not on Omarchy* below are deliberately left to it ([ADR-0026](docs/adrs/0026-omarchy-as-os-variant.md)).
 
 - **myplace** orchestrates bootstrap, updates, drift reporting, diagnostics, and self-update.
 - **chezmoi** applies the files and scripts under `home/`.
-- **mise** installs registry-backed CLI tools from `home/dot_config/mise/config.toml.tmpl`.
+- **mise** installs registry-backed CLI tools from `home/.chezmoitemplates/mise-config.toml`, rendered to `~/.config/mise/config.toml` (or, on Omarchy, `~/.config/mise/conf.d/myplace.toml`, leaving `config.toml` to the distro's tool launchers).
 - **The provision script** installs system packages, frameworks, and tools that mise should not own.
 
 On a new machine, `install.sh` installs the `myplace` binary into `~/.local/bin`. The bootstrap flow then installs chezmoi and mise there when missing, initializes and applies this repository, and runs `mise install`. The [bootstrap workflow](docs/workflows/bootstrap-new-machine.md) is the detailed source of truth.
@@ -36,7 +36,7 @@ On a new machine, `install.sh` installs the `myplace` binary into `~/.local/bin`
 | Development and automation | `pnpm`, `bun`, `d2`, `ast-grep`, `hyperfine` |
 | System and terminal | `herdr`, `fastfetch` |
 
-Linux also gets `btop` from mise. macOS gets `btop` through Homebrew when Homebrew is available. Desktop profiles also get `duckdb`; servers omit it. `okq` is not in mise's registry and is installed from its GitHub releases through mise's `github:` backend.
+Linux also gets `btop` from mise. macOS gets `btop` through Homebrew when Homebrew is available. Desktop profiles also get `duckdb`; servers omit it. Omarchy omits `herdr` from mise (the distro packages it and a shipped migration removes any mise copy); the managed herdr config and plugins still apply there. `okq` is not in mise's registry and is installed from its GitHub releases through mise's `github:` backend.
 
 ### Managed outside mise
 
@@ -44,13 +44,13 @@ The idempotent provision script at `home/.chezmoiscripts/run_onchange_provision.
 
 - `git` and `zsh`
 - oh-my-zsh with `zsh-autosuggestions` and `zsh-syntax-highlighting`
-- rustup with the stable Rust toolchain
+- rustup with the stable Rust toolchain (the `rustup` package on pacman systems, the official installer elsewhere)
 - `tokei`, built with rustup's Cargo because its current releases are source-only
 - `cargo-update`, built with rustup's Cargo (crates.io-only, no prebuilt release). It provides `cargo install-update`, which keeps the Cargo-installed binaries current and backs the `cargo` source of `myplace outdated`
 - fnm for Node.js version management; Node is not managed by mise
 - `pay-respects`
-- `httpie`, `mosh`, GNU nano, and a current Neovim
-- platform prerequisites when needed, including `bash`, `unzip`, and a C build toolchain
+- `httpie`, `mosh`, GNU nano, and a current Neovim (the official static build on Linux, skipped when the distro's own Neovim is already 0.10 or newer — e.g. Omarchy's)
+- platform prerequisites when needed, including `bash`, `unzip`, and a C build toolchain (`base-devel` on Arch; installs go through `omarchy pkg add` when that wrapper exists)
 - the managed herdr machine-title plugin and the third-party herdr command-palette plugin
 
 On macOS, these installs use Homebrew only when it is already present; Homebrew itself is not required or installed. On supported Apple Silicon Macs, the script also attempts to install Apple's `container` CLI.
@@ -73,27 +73,27 @@ Desktop machines need 1Password only to fetch a missing or empty age identity du
 
 | Target | What is managed |
 |---|---|
-| `~/.zshrc` and `~/.mvdotfiles.zsh` | oh-my-zsh plugins, PATHs, mise/fnm/rustup activation, agent-safe shell behavior, Starship, zoxide, fzf, Atuin, aliases, functions, and editor defaults |
+| `~/.zshrc` and `~/.mvdotfiles.zsh` | oh-my-zsh plugins, PATHs, mise/fnm/rustup activation, agent-safe shell behavior, Starship, zoxide, fzf, Atuin, aliases, functions, and editor defaults. On Omarchy they also source the distro's env layer and its aliases/functions (interactive shells only) and defer `EDITOR` to it |
 | `~/.gitconfig` | Per-machine identity, delta pager, modern pull/push/fetch/rebase defaults, rerere, Git LFS filters, and automatic SSH signing when a public key exists |
 | `~/.config/git/allowed_signers` and `ignore` | Local SSH signature verification and global ignore rules |
 | `~/.ssh/config` | Shared secure defaults, OS-specific options, and the colima VM include on macOS |
 | `~/.ssh/config.d/hosts` | Age-encrypted fleet host list on desktop profiles only |
 | `~/.ssh/authorized_keys` | Shared authorized public keys |
-| `~/.config/nvim` | LazyVim-based Neovim configuration, keymaps, options, autocmds, and colorscheme |
+| `~/.config/nvim` | LazyVim-based Neovim configuration, keymaps, options, autocmds, and colorscheme (*not on Omarchy*, which ships its own themed LazyVim tree) |
 | `~/.nanorc` | GNU nano behavior and syntax highlighting |
-| `~/.config/alacritty/alacritty.toml` | Alacritty terminal configuration |
-| `~/.config/ghostty/config` | Ghostty terminal configuration |
+| `~/.config/alacritty/alacritty.toml` | Alacritty terminal configuration (*not on Omarchy*) |
+| `~/.config/ghostty/config` | Ghostty terminal configuration (*not on Omarchy*) |
 | `~/.config/zed/settings.json` | Zed editor settings |
 | `~/.config/flashspace/settings.json` | FlashSpace settings |
-| `~/.config/starship/starship.toml` | Starship prompt |
+| `~/.config/starship/starship.toml` | Starship prompt (*not on Omarchy*) |
 | `~/.config/atuin` | Atuin behavior and Catppuccin theme |
-| `~/.config/bat/config` | bat display and theme settings |
+| `~/.config/bat/config` | bat display and theme settings (*not on Omarchy*, where `BAT_THEME=ansi` follows the terminal theme) |
 | `~/.config/eza/theme.yml` | eza colors and icons |
 | `~/.config/hunk/config.toml` | hunk diff-viewer theme and behavior |
 | `~/.config/herdr` | Multiplexer settings, command-palette binding, and the fleet-aware terminal-title plugin |
 | `~/.config/tlrc/config.toml` | `tldr` client settings |
 | `~/.config/gh/config.yml` | GitHub CLI settings |
-| `~/.config/mise/config.toml` | The global fleet tool declaration |
+| `~/.config/mise/config.toml` | The global fleet tool declaration. On Omarchy the same declaration renders to `~/.config/mise/conf.d/myplace.toml` and `config.toml` stays the distro's |
 | `~/.claude/CLAUDE.md` | Fleet-wide Claude Code preferences: coding and TypeScript conventions, documentation-first practice, tooling defaults, and how the agent should engage. Only this file is managed; the rest of `~/.claude` (settings, sessions, caches, plugins) stays machine-local |
 
 Machine identity and behavior are recorded as chezmoi data during bootstrap: profile, Git name, Git email, and whether the machine normally pushes shared changes.
@@ -125,6 +125,7 @@ The following scripts are deployed to `~/.mvscripts` and placed on `PATH`. Run `
 - The `shareplan` API key lives at `${XDG_CONFIG_HOME:-$HOME/.config}/shareplan/key`, is created with owner-only permissions by `shareplan auth`, and is never managed by chezmoi.
 - Servers ignore `.ssh/config.d`, so they do not decrypt the host list or need the age key or 1Password CLI.
 - Neovim's `lazy-lock.json`, herdr's plugin registry, caches, logs, histories, and application-generated state remain machine-local.
+- On Omarchy, the terminal, Neovim, Starship and bat configs and `~/.config/mise/config.toml` are the distro's (see above); `chsh` to zsh and the 1Password CLI app-integration toggle are one-time manual steps ([managed-setup guide](docs/guides/managed-setup.md#omarchy-the-os-variant-gate)).
 - myplace logs live under `$XDG_STATE_HOME/myplace`, not in the managed config tree.
 
 ## Present only when installed separately

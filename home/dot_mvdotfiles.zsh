@@ -5,6 +5,26 @@
 # human shell never loses its tooling. See docs/guides/agent-friendly-shell.md.
 if [[ "${MYPLACE_INTERACTIVE_SHELL:-1}" == 1 ]]; then
 
+## Omarchy's aliases and functions (ADR-0026). Sourced from the distro's own
+## files (not copied) so they track `omarchy update`. Interactive-only: they
+## shadow `ls`, and agents want the real one. Sourced FIRST so our own
+## definitions below win on a name clash (`c`, `ls`, `lt`). The bash-only files
+## (inputrc, completions, shell, init) are not sourced; `fns/tmux`, `fns/herdr`
+## and `fns/drives` are skipped because they rely on bash's 0-indexed arrays and
+## `read -p`, which misbehave in zsh — `bash -ic 'hdl …'` if you want those.
+if [[ -n "$OMARCHY_PATH" && -d "$OMARCHY_PATH/default/bash" ]]; then
+    [[ -r "$OMARCHY_PATH/default/bash/aliases" ]] && source "$OMARCHY_PATH/default/bash/aliases"
+    for _omarchy_fn in "$OMARCHY_PATH"/default/bash/fns/*; do
+        case "${_omarchy_fn##*/}" in tmux|herdr|drives) continue ;; esac
+        [[ -r "$_omarchy_fn" ]] && source "$_omarchy_fn"
+    done
+    unset _omarchy_fn
+    # Omarchy aliases `cd` to its own zoxide wrapper (`zd`, which calls `z`);
+    # zoxide's `--cmd cd` init below already owns `cd` and defines no `z`, so
+    # that alias would break every cd. Drop it.
+    unalias cd 2>/dev/null
+fi
+
 ## Starship
 if [[ -x "$(command -v starship)" ]]; then
     eval "$(starship init zsh)"
@@ -131,7 +151,10 @@ if [[ "${MYPLACE_INTERACTIVE_SHELL:-1}" == 1 ]]; then
 fi
 
 ## Some ENV things
-export EDITOR="nvim"
+# On Omarchy, EDITOR is the distro's (`omarchy-launch-editor --inline`, set by
+# its envs file which .zshrc sources first) so `omarchy` and its editor picker
+# agree with the shell — defer to it there (ADR-0026).
+[[ -n "$OMARCHY_PATH" ]] || export EDITOR="nvim"
 
 ## Claude Code
 # Reduce TUI repaint flicker. Exported (not just set) so the claude child

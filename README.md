@@ -12,7 +12,7 @@ Target machines: personal Macs, a work Mac, a personal Linux desktop, and assort
 
 This repo is a monorepo: the Go app, the chezmoi dotfiles (under [home/](home/), via `.chezmoiroot`), and the machines' mise config all live here — one clone carries everything ([ADR-0003](docs/adrs/0003-monorepo-app-dotfiles-mise.md)).
 
-> 🚧 **v0.** Bootstrap, status (TUI + `--json`), update with interactive capture of local edits and per-file incoming diff review, profile push policy, outdated-package inventory (mise + brew + shelly + AI skills + cargo, TUI + `--json`), system info (`sysinfo`, TUI band + `--json`), preflight diagnostics (`doctor`, + `--json`), `self-update`, and self-describing help (`help --llm`/`--json`) all work. Not yet built: the phase-2 server.
+> 🚧 **v0.** Bootstrap, status (TUI + `--json`), update with interactive capture of local edits and per-file incoming diff review, profile push policy, outdated-package inventory (mise + brew + shelly + pacman + AI skills + cargo, TUI + `--json`), system info (`sysinfo`, TUI band + `--json`), preflight diagnostics (`doctor`, + `--json`), `self-update`, and self-describing help (`help --llm`/`--json`) all work. Not yet built: the phase-2 server.
 
 ## Install
 
@@ -44,6 +44,8 @@ myplace bootstrap --profile server --yes
 
 `bootstrap` also takes `--repo <url>` (the dotfiles repo, defaults to this one) and `--git-name` / `--git-email` to seed this machine's git identity non-interactively — handy in an unattended image build.
 
+**On an [Omarchy](https://omarchy.org/) desktop** the profile is `personal-linux`; the distro keeps its own themed terminal/Neovim/Starship/bat configs and its `~/.config/mise/config.toml` (the fleet tool set lands in `~/.config/mise/conf.d/` instead), and everything else applies as usual ([ADR-0026](docs/adrs/0026-omarchy-as-os-variant.md)). Before the first apply: turn on *Integrate with 1Password CLI* in the 1Password app and sign in once; back up Omarchy's seeded herdr config (`cp ~/.config/herdr/config.toml ~/.config/herdr/config.toml.omarchy`) since the managed one replaces it. Expect sudo prompts during the apply. Afterwards: `chsh -s /usr/bin/zsh` (provision installs zsh but never changes the login shell), and optionally `omarchy font set "FiraCode Nerd Font Mono"`.
+
 Details and failure handling: [bootstrap workflow](docs/workflows/bootstrap-new-machine.md).
 
 ## Everyday use
@@ -53,7 +55,7 @@ myplace              # TUI dashboard: drift in both directions, r refresh / u up
 myplace update       # capture local edits (keep/discard/skip per file), pull + apply, upgrade tools
 myplace status       # quick plain-text summary, no TUI
 myplace doctor       # preflight: can this machine run myplace? names a remedy for anything wrong
-myplace outdated     # what's upgradable across package managers (mise, brew, shelly, AI skills, cargo), read-only
+myplace outdated     # what's upgradable across package managers (mise, brew, shelly, pacman, AI skills, cargo), read-only
 myplace sysinfo      # this machine's OS + hardware specs (via fastfetch), read-only
 myplace self-update  # swap this binary for the latest release
 myplace version      # print the version (add --json for a machine-readable document)
@@ -63,7 +65,7 @@ Narrow an update to one half with `myplace update --dotfiles` (pull + apply only
 
 "In sync" is bidirectional: repo changes you haven't applied **and** local edits you haven't pushed both count as drift. Updating always shows you the diff before touching anything.
 
-`myplace outdated` is the cross-manager "what's upgradable here?" view — mise tools, plus (when present) Homebrew packages, Shelly-managed system packages (Arch/CachyOS), third-party AI skills from the skills.sh CLI, and Cargo-installed Rust binaries (via `cargo install-update`), **including software myplace doesn't manage**. It's informational and read-only: it never upgrades anything and never affects the `status` drift verdict. In the dashboard, the "Updates available" pane summarizes it and `o` opens the full list.
+`myplace outdated` is the cross-manager "what's upgradable here?" view — mise tools, plus (when present) Homebrew packages, Shelly-managed system packages (CachyOS), pacman repo + AUR updates (Arch/Omarchy, via `checkupdates` and `yay`), third-party AI skills from the skills.sh CLI, and Cargo-installed Rust binaries (via `cargo install-update`), **including software myplace doesn't manage**. It's informational and read-only: it never upgrades anything and never affects the `status` drift verdict. In the dashboard, the "Updates available" pane summarizes it and `o` opens the full list.
 
 `myplace doctor` answers a different question than `status`: not "is this machine in sync" but "can myplace run here at all." It's a read-only preflight — chezmoi and mise installed and recent enough, `~/.local/bin` on `PATH`, the dotfiles repo and GitHub API reachable, the state dir writable — and every failure prints the exact remedy. Exit codes follow the headless contract (`0` ready, `1` a check failed, `2` checks incomplete e.g. offline, `3` error), so a provisioning script can gate on `myplace doctor --json` before attempting a bootstrap. Reachability checks degrade to a warning when offline rather than failing — being offline isn't broken.
 
@@ -94,7 +96,7 @@ After install + a bootstrap, this is what lands where. Paths honor the XDG base 
 | `~/.local/bin/myplace` | The binary itself. Override the install dir with `MYPLACE_BIN_DIR`. |
 | `~/.local/share/chezmoi/` | chezmoi's **source clone** of this repo — the copy `myplace update` does `git pull` + apply on. The dotfiles live under its `home/` subdir (selected by [`.chezmoiroot`](home/)). Edit + push the repo, not the applied files. |
 | `~/.zshrc`, `~/.mvdotfiles.zsh`, `~/.gitconfig` | Dotfiles applied into `$HOME` from the source state. Editing these directly shows up as drift. |
-| `~/.config/mise/config.toml` | This machine's global mise tool set, rendered from `home/dot_config/mise/config.toml.tmpl`. |
+| `~/.config/mise/config.toml` | This machine's global mise tool set, rendered from `home/.chezmoitemplates/mise-config.toml`. On Omarchy the same set renders to `~/.config/mise/conf.d/myplace.toml` and `config.toml` is left to the distro. |
 | `~/.mvscripts/shareplan` | Managed helper for publishing raw HTML plans to `share.valstar.dev`; run `shareplan --help` for file, pipeline, auth, and update examples. |
 | `~/.config/shareplan/key` | Machine-local `shareplan` API key created by `shareplan auth` with mode `0600`; never managed by chezmoi. Honors `XDG_CONFIG_HOME`. |
 | `~/.ssh/config` | Rendered (desktops only — `personal-mac`/`work-mac`/`personal-linux`, not servers): non-secret global defaults from the template, plus an `Include` of `~/.ssh/config.d/hosts` — the host list, committed **age-encrypted** and decrypted locally at apply time, so server IPs never sit in this public repo in plaintext ([ADR-0022](docs/adrs/0022-age-encrypted-dotfiles.md)). The decryption key is fetched from 1Password automatically whenever it's missing or empty — normally just once, at first apply — and after that no `op` is needed day-to-day. Edit hosts via the encrypted file, not here — see below. |

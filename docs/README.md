@@ -10,6 +10,7 @@ This project is documentation-first: decisions, features, and workflows are writ
 | [features/](features/) | Feature specs — what a capability does, its scope, and its acceptance criteria | Before building a new user-visible capability |
 | [workflows/](workflows/) | End-to-end flows the TUI supports (e.g. "bootstrap a new machine") from the user's point of view | When defining or changing how a user accomplishes a goal |
 | [guides/](guides/) | Developer guides — how to work on this repo, how the libraries we depend on behave, conventions, gotchas | When you learn something a future developer (or AI agent) will need |
+| [plans/](plans/) | Working plans and surveys — the reviewed, ticked-off checklists that precede an ADR or a batch of changes | When a change is big enough to want a per-item review before the docs and code are written; the resulting ADR is the decision record, the plan is the trail |
 
 Each folder contains a `_template.md` showing the expected format for that doc type. Copy it as the starting point for new docs.
 

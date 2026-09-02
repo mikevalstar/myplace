@@ -37,6 +37,18 @@ export PATH="$HOME/.local/bin:$PATH"
 # mise — activate so mise-managed CLI tools are on PATH.
 command -v mise >/dev/null 2>&1 && eval "$(mise activate zsh)"
 
+# Omarchy (ADR-0026): adopt the distro's env layer — OMARCHY_PATH, its PATH
+# additions, EDITOR/BROWSER/BAT_THEME/MANPAGER and the locale fixups — so an
+# `omarchy …` command and its theme-aware tools behave the same under zsh as
+# under the stock bash. Both files are POSIX. Runtime-gated on the Omarchy root
+# so this rc stays a plain (non-template) file and no-ops everywhere else. Its
+# aliases/functions are sourced from .mvdotfiles.zsh (interactive-only).
+if [ -d "${OMARCHY_PATH:-/usr/share/omarchy}" ]; then
+  export OMARCHY_PATH="${OMARCHY_PATH:-/usr/share/omarchy}"
+  [ -r "$OMARCHY_PATH/default/bash/env-bootstrap" ] && . "$OMARCHY_PATH/default/bash/env-bootstrap"
+  [ -r "$OMARCHY_PATH/default/bash/envs" ] && . "$OMARCHY_PATH/default/bash/envs"
+fi
+
 # Personal shared dotfiles: tool inits, aliases, functions.
 [ -f "$HOME/.mvdotfiles.zsh" ] && source "$HOME/.mvdotfiles.zsh"
 
@@ -51,8 +63,11 @@ if command -v fnm >/dev/null 2>&1; then
   fi
 fi
 
-# Rust / cargo (rustup).
+# Rust / cargo (rustup). ~/.cargo/env is written by rustup's curl installer; a
+# distro rustup package (Arch's, ADR-0026) writes none, so also put ~/.cargo/bin
+# — where `cargo install` binaries (tokei, cargo-update) land — on PATH directly.
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+[ -d "$HOME/.cargo/bin" ] && case ":$PATH:" in *":$HOME/.cargo/bin:"*) ;; *) export PATH="$HOME/.cargo/bin:$PATH" ;; esac
 
 # opencode
 [ -d "$HOME/.opencode/bin" ] && export PATH="$HOME/.opencode/bin:$PATH"

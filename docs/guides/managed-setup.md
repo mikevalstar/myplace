@@ -2,8 +2,8 @@
 title: Extending the managed setup (tools & dotfiles)
 status: active
 created: 2026-06-13
-updated: 2026-08-20
-tags: [chezmoi, mise, dotfiles, provisioning, skills, cargo, how-to]
+updated: 2026-09-02
+tags: [chezmoi, mise, dotfiles, provisioning, skills, cargo, omarchy, how-to]
 audience: both
 ---
 
@@ -17,9 +17,9 @@ Where things live and how to add a new tool, dotfile, or provisioning step so it
 
 | Path | What it is |
 |------|------------|
-| `dot_config/mise/config.toml.tmpl` | The mise tool set — every machine's CLI tools/runtimes from mise's registry |
+| `.chezmoitemplates/mise-config.toml` | **The mise tool set** — every machine's CLI tools/runtimes from mise's registry. Edit *this* file. It's rendered by two thin wrappers: `dot_config/mise/config.toml.tmpl` (→ `~/.config/mise/config.toml`, every machine but Omarchy) and `dot_config/mise/conf.d/myplace.toml.tmpl` (→ `~/.config/mise/conf.d/myplace.toml`, Omarchy only, where `config.toml` belongs to the distro — [ADR-0026](../adrs/0026-omarchy-as-os-variant.md)). Each wrapper is `.chezmoiignore`d on the other kind of machine |
 | `dot_mvscripts/executable_*` | Helper scripts deployed to a dedicated `~/.mvscripts` (on `PATH`), runnable by name on every machine; `mv_scripts` lists them ([ADR-0014](../adrs/0014-managed-scripts-and-bun-runner.md)) |
-| `.chezmoiscripts/run_onchange_provision.sh.tmpl` | Idempotent installer for the things mise can't own — git, zsh, oh-my-zsh + plugins, rustup, fnm (+ unzip), tokei and cargo-update (cargo builds), a current neovim (official static build → `/usr/local` on Linux, brew on macOS), plain OS/brew packages via `ensure_tool` (httpie, mosh, nano), and macOS fonts/GUI casks via `ensure_cask`. A chezmoi template (`.tmpl`) so it can branch on `.profile`: a final block gated to non-`server` Linux installs the Linux **desktop** extras — the `op` CLI, `wl-clipboard` (Wayland copy/paste), and Nerd Fonts into `$HOME` ([ADR-0017](../adrs/0017-linux-desktop-profile.md)) |
+| `.chezmoiscripts/run_onchange_provision.sh.tmpl` | Idempotent installer for the things mise can't own — git, zsh, oh-my-zsh + plugins, rustup (the `rustup` package on pacman systems, the curl installer elsewhere), fnm (+ unzip), tokei and cargo-update (cargo builds), a current neovim (official static build → `/usr/local` on Linux — skipped when the distro's own nvim is already ≥ 0.10, brew on macOS), plain OS/brew packages via `ensure_tool` (httpie, mosh, nano; on Arch `pm_install` maps Debian names like `build-essential` → `base-devel` and goes through `omarchy pkg add` when that wrapper exists), and macOS fonts/GUI casks via `ensure_cask`. A chezmoi template (`.tmpl`) so it can branch on `.profile`: a final block gated to non-`server` Linux installs the Linux **desktop** extras — the `op` CLI, `wl-clipboard` (Wayland copy/paste), and Nerd Fonts into `$HOME` ([ADR-0017](../adrs/0017-linux-desktop-profile.md)) |
 | `dot_zshrc` | The managed `~/.zshrc` — oh-my-zsh setup, mise activation, tool env wiring |
 | `dot_gitconfig.tmpl` | `~/.gitconfig` — identity (name/email from `.gitName`/`.gitEmail`), modern defaults, and SSH commit signing auto-enabled when a key exists ([ADR-0015](../adrs/0015-git-defaults-and-ssh-commit-signing.md)) |
 | `dot_config/git/allowed_signers.tmpl` | `~/.config/git/allowed_signers` — generated `<email> <pubkey>` so local signature verification works; empty (and signing off) on a keyless machine |
@@ -36,7 +36,7 @@ Where things live and how to add a new tool, dotfile, or provisioning step so it
 ### A CLI tool that's in mise's registry
 
 1. Check it exists: `mise registry | grep <name>`.
-2. Add a line under `[tools]` in `dot_config/mise/config.toml.tmpl`:
+2. Add a line under `[tools]` in `.chezmoitemplates/mise-config.toml` (the one body both mise targets render — see the layout table):
    ```toml
    ripgrep = "latest"
    ```
@@ -214,8 +214,30 @@ The worked example is the SSH host list
 
 Tool init (`eval "$(x init zsh)"`, PATH additions) goes in `dot_mvdotfiles.zsh`, guarded with `command -v x` so a missing tool is silent. mise activation and the fnm/cargo env lines live in `dot_zshrc`.
 
+## Omarchy: the OS-variant gate
+
+An [Omarchy](https://omarchy.org/) box is a `personal-linux` desktop whose distro owns the themed desktop layer, so a slice of the managed tree is switched off there and the rest applies unchanged ([ADR-0026](../adrs/0026-omarchy-as-os-variant.md)). The gate is the os-release id, **not** a profile:
+
+```
+{{ if eq (dig "osRelease" "id" "" .chezmoi) "omarchy" }}…{{ end }}
+```
+
+(`dig` rather than `.chezmoi.osRelease.id` because macOS has no `/etc/os-release` and the bare lookup would error there.) Where it's used:
+
+| Where | Effect on Omarchy |
+|-------|-------------------|
+| `.chezmoiignore` | Ignores `.config/alacritty/**`, `.config/ghostty/**`, `.config/nvim/**`, `.config/starship/**`, `.config/bat/config` (Omarchy's versions import the live theme and get rewritten by `omarchy theme set` / `omarchy font set` / migrations) and `.config/mise/config.toml` (Omarchy's tool launchers `mise use -g` into it on every run). On every *other* machine it ignores the `conf.d` twin instead. |
+| `.chezmoitemplates/mise-config.toml` | `herdr` is left out — Omarchy packages it and a shipped migration uninstalls any mise herdr. Our herdr **config and plugins still apply** (herdr's `config.toml` is deliberately not ignored). |
+| `dot_zshrc` / `dot_mvdotfiles.zsh` | Runtime-gated on `/usr/share/omarchy` (so the rc files stay plain, non-template files): `.zshrc` sources Omarchy's `env-bootstrap` + `envs` (its `EDITOR`/`BROWSER`/`BAT_THEME`/`MANPAGER`/locale layer — our `EDITOR=nvim` export yields to it there); `.mvdotfiles.zsh` sources Omarchy's `aliases` and the zsh-clean `fns/*` inside the interactive-only block, *before* our aliases so ours win on a clash, and drops its `cd=zd` alias (zoxide's `--cmd cd` owns `cd`). `fns/tmux`, `fns/herdr`, `fns/drives` are skipped (bash-only array/`read -p` semantics). |
+| provision script | Not Omarchy-specific but what makes it work there: `pm_install` maps `build-essential` → `base-devel` and prefers `omarchy pkg add`; rustup comes from pacman (+ `rustup default stable`); the neovim static build is skipped when a distro nvim ≥ 0.10 that isn't ours is on PATH. |
+
+Adding something that Omarchy also ships themed (a terminal config, an nvim plugin): add its target to the Omarchy block of `.chezmoiignore` and leave the source file alone. Adding a tool to the baseline: the one edit in `.chezmoitemplates/mise-config.toml` reaches Omarchy through `conf.d`. Anything you `mise use -g` by hand on an Omarchy box lands in *its* `config.toml` and is never touched by `myplace`.
+
+**First apply on an Omarchy box** (the manual steps, in order): enable *Integrate with 1Password CLI* in the 1Password app and sign in once (the `op` binary is already installed and setgid there); back up Omarchy's seeded herdr config (`cp ~/.config/herdr/config.toml ~/.config/herdr/config.toml.omarchy`) because ours replaces it; `myplace bootstrap` with profile `personal-linux` (accept the sudo prompts — no passwordless sudo); then `chsh -s /usr/bin/zsh` once zsh is installed (provision installs it but never runs `chsh`). `omarchy font set "FiraCode Nerd Font Mono"` is the sanctioned way to get our terminal font there, if wanted — not a managed terminal config. Never run Omarchy's `dev-env` installer: it `mise use -g node`s, and Node is fnm's (ADR-0007).
+
 ## Gotchas
 
+- **The mise baseline lives in `.chezmoitemplates/mise-config.toml`, not the two `.tmpl` wrappers.** Both `dot_config/mise/config.toml.tmpl` and `dot_config/mise/conf.d/myplace.toml.tmpl` are one-line `{{ template }}` calls; editing a wrapper changes nothing for the other kind of machine ([ADR-0026](../adrs/0026-omarchy-as-os-variant.md)).
 - **Node is fnm's, Rust is rustup's — not mise's.** Don't add `node`/`rust` to the mise config; they're installed by the provision script and managed by fnm/rustup (ADR-0007). Adding them to mise creates two managers fighting over the same binary.
 - **Watch for tools whose only mise backend is `cargo:`/source.** Most tools resolve to a prebuilt-binary backend (`aqua:`/`github:`), but some default to `cargo:`, which runs `cargo install` — needing a Rust toolchain on `PATH` (which a fresh bootstrap doesn't have) and meaning mise drives cargo (which it must not — Rust is rustup's, ADR-0007). Check with `mise registry <tool>`. If a prebuilt backend exists, pin it (`"aqua:Owner/Repo" = "latest"`). If the tool is genuinely source-only (e.g. `tokei`, which dropped prebuilt binaries after v12), keep it **out** of the mise config and build it in `run_onchange_provision.sh` with rustup's cargo — sourcing `~/.cargo/env` first so cargo is on `PATH` that run.
 - **The provision script runs before `mise install`** (during `chezmoi apply`), so it can't use any mise tool.

@@ -238,7 +238,11 @@ func Parse(out []byte) (*Info, error) {
 // aren't a fastfetch module, so they're read separately from `uptime`
 // (best-effort: a failure leaves Load nil rather than failing the whole fetch).
 func (c *Client) Fetch(ctx context.Context) (*Info, error) {
-	out, err := c.r.Run(ctx, c.home, "fastfetch", "--format", "json")
+	// --config none: use fastfetch's built-in module set, never the machine's
+	// /etc/fastfetch or ~/.config/fastfetch config. A distro-shipped config
+	// (Omarchy's, ADR-0026) replaces the module list — no OS or LocalIp entry —
+	// and the parse silently came back empty; the set we parse must be ours.
+	out, err := c.r.Run(ctx, c.home, "fastfetch", "--config", "none", "--format", "json")
 	if err != nil {
 		return nil, err
 	}

@@ -1,0 +1,5 @@
+{{- /* Omarchy only (ignored elsewhere, ADR-0026): the same fleet baseline as
+     config.toml.tmpl, rendered into mise's conf.d so ~/.config/mise/config.toml
+     stays Omarchy's — its tool launchers `mise use -g` into it on every run.
+     mise merges conf.d/*.toml with config.toml; config.toml loads last. */ -}}
+{{ template "mise-config.toml" . -}}

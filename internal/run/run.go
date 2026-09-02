@@ -5,6 +5,7 @@ package run
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -66,9 +67,40 @@ func (e Exec) Run(ctx context.Context, dir string, name string, args ...string) 
 		if msg == "" {
 			msg = err.Error()
 		}
-		return stdout.Bytes(), fmt.Errorf("%s %s: %s", name, strings.Join(args, " "), msg)
+		rerr := &Error{Msg: fmt.Sprintf("%s %s: %s", name, strings.Join(args, " "), msg), Stderr: strings.TrimSpace(stderr.String()), Code: -1}
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			rerr.Code = exitErr.ExitCode()
+		}
+		return stdout.Bytes(), rerr
 	}
 	return stdout.Bytes(), nil
+}
+
+// Error is the failure Exec returns. Its message is the same "<cmd> <args>:
+// <stderr-or-cause>" line callers have always seen; Code and Stderr let a
+// wrapper tell a meaningful non-zero exit apart from a real failure — pacman's
+// `checkupdates` exits 2 for "nothing to update", `yay -Qua` exits 1 — without
+// string-matching the message. Code is -1 when the process never ran (not on
+// PATH, context cancelled).
+type Error struct {
+	Msg    string
+	Stderr string
+	Code   int
+}
+
+func (e *Error) Error() string { return e.Msg }
+
+// ExitCode extracts the process exit code from an error returned by a Runner.
+// ok is false when err isn't a run.Error (a fake runner, a wrapped error) or
+// the process never started. Stderr is returned alongside so callers can
+// distinguish a silent status exit from a real failure.
+func ExitCode(err error) (code int, stderr string, ok bool) {
+	var rerr *Error
+	if errors.As(err, &rerr) && rerr.Code >= 0 {
+		return rerr.Code, rerr.Stderr, true
+	}
+	return 0, "", false
 }
 
 func (e Exec) tail(s string) string {

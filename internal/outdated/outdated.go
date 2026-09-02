@@ -17,6 +17,7 @@ import (
 	"github.com/mikevalstar/myplace/internal/brew"
 	"github.com/mikevalstar/myplace/internal/cargo"
 	"github.com/mikevalstar/myplace/internal/mise"
+	"github.com/mikevalstar/myplace/internal/pacman"
 	"github.com/mikevalstar/myplace/internal/shelly"
 	"github.com/mikevalstar/myplace/internal/skills"
 )
@@ -166,6 +167,31 @@ func ShellySource(c *shelly.Client) Source { return shellySource{c} }
 func (s shellySource) Name() string                       { return "shelly" }
 func (s shellySource) Available(ctx context.Context) bool { return s.c.Installed(ctx) }
 func (s shellySource) Outdated(ctx context.Context) ([]Package, error) {
+	p, err := s.c.Outdated(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pkgs := make([]Package, 0, len(p))
+	for _, e := range p {
+		pkgs = append(pkgs, Package{Name: e.Name, Current: e.Current, Latest: e.Latest})
+	}
+	return pkgs, nil
+}
+
+type pacmanSource struct{ c *pacman.Client }
+
+// PacmanSource adapts a pacman client (Arch-family boxes: Omarchy, plain Arch —
+// ADR-0026). Present-if-installed like brew/shelly: Available() is true only
+// where `checkupdates` (pacman-contrib) is on PATH. Reports the sync-repo
+// updates plus, when yay is installed, AUR updates prefixed `aur:`. Read-only:
+// checkupdates only refreshes a temporary database copy, and `pacman -Syu` is
+// never run from myplace. On a CachyOS box that has shelly too, the two rows
+// overlap — accepted, both are informational.
+func PacmanSource(c *pacman.Client) Source { return pacmanSource{c} }
+
+func (s pacmanSource) Name() string                       { return "pacman" }
+func (s pacmanSource) Available(ctx context.Context) bool { return s.c.Installed(ctx) }
+func (s pacmanSource) Outdated(ctx context.Context) ([]Package, error) {
 	p, err := s.c.Outdated(ctx)
 	if err != nil {
 		return nil, err
