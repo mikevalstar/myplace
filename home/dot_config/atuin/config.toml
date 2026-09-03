@@ -42,5 +42,4 @@ name = "catppuccin-mocha-mauve"
 records = true
 
 [ai]
-# Atuin AI features (natural-language history search) on every machine.
 enabled = true
