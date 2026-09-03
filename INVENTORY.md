@@ -49,7 +49,7 @@ The idempotent provision script at `home/.chezmoiscripts/run_onchange_provision.
 - `cargo-update`, built with rustup's Cargo (crates.io-only, no prebuilt release). It provides `cargo install-update`, which keeps the Cargo-installed binaries current and backs the `cargo` source of `myplace outdated`
 - fnm for Node.js version management; Node is not managed by mise
 - `pay-respects`
-- `httpie`, `mosh`, GNU nano, and a current Neovim (the official static build on Linux, skipped when the distro's own Neovim is already 0.10 or newer — e.g. Omarchy's)
+- `httpie`, `mosh`, `pv`, GNU nano, and a current Neovim (the official static build on Linux, skipped when the distro's own Neovim is already 0.10 or newer — e.g. Omarchy's)
 - platform prerequisites when needed, including `bash`, `unzip`, and a C build toolchain (`base-devel` on Arch; installs go through `omarchy pkg add` when that wrapper exists)
 - the managed herdr machine-title plugin and the third-party herdr command-palette plugin
 
