@@ -164,3 +164,9 @@ fi
 # process inherits it. Captured from a local ~/.zshrc edit and brought under
 # management so it applies on every machine.
 export CLAUDE_CODE_NO_FLICKER=1
+
+## Firefox (Omarchy only)
+# Use Wayland's idle-inhibit protocol for Firefox's wake lock so video playback
+# keeps the screen awake under Hyprland. Runtime-gated on OMARCHY_PATH (set by
+# .zshrc only on Omarchy, ADR-0026), same as the EDITOR override above.
+[[ -n "$OMARCHY_PATH" ]] && export MOZ_WAKE_LOCK_TYPE=WaylandIdleInhibit
