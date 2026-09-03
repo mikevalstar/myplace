@@ -40,3 +40,7 @@ name = "catppuccin-mocha-mauve"
 [sync]
 # Use sync v2 (record-based) so multi-machine history stays consistent.
 records = true
+
+[ai]
+# Atuin AI features (natural-language history search) on every machine.
+enabled = true
