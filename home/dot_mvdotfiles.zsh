@@ -164,6 +164,7 @@ fi
 # process inherits it. Captured from a local ~/.zshrc edit and brought under
 # management so it applies on every machine.
 export CLAUDE_CODE_NO_FLICKER=1
+export CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION=1500
 
 ## Firefox (Omarchy only)
 # Use Wayland's idle-inhibit protocol for Firefox's wake lock so video playback
