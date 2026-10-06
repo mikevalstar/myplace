@@ -23,6 +23,7 @@ import (
 	"github.com/mikevalstar/myplace/internal/shelly"
 	"github.com/mikevalstar/myplace/internal/skills"
 	"github.com/mikevalstar/myplace/internal/sysinfo"
+	"github.com/mikevalstar/myplace/internal/toolchain"
 	"github.com/mikevalstar/myplace/internal/tui"
 	"github.com/mikevalstar/myplace/internal/version"
 )
@@ -85,8 +86,10 @@ func newRootCmd(r run.Runner, ch *chezmoi.Client, ms *mise.Client) *cobra.Comman
 	// when its CLI isn't on PATH, so listing them all is safe everywhere: brew
 	// shows up on Macs, shelly on CachyOS, pacman on Arch-family boxes with
 	// checkupdates (Omarchy, ADR-0026), skills on any box with the skills.sh
-	// CLI, cargo wherever rustup + cargo-update are installed, mise anywhere (present-if-installed, ADR-0008/0009/0010/0023). The TUI
-	// renders whatever's in this slice, so a new source needs no dashboard change.
+	// CLI, cargo wherever rustup + cargo-update are installed, mise anywhere,
+	// and toolchain on any myplace-managed box (present-if-installed,
+	// ADR-0008/0009/0010/0023/0027). The TUI renders whatever's in this slice, so
+	// a new source needs no dashboard change.
 	sources := []outdated.Source{
 		outdated.MiseSource(ms),
 		outdated.BrewSource(brew.New(r)),
@@ -94,6 +97,9 @@ func newRootCmd(r run.Runner, ch *chezmoi.Client, ms *mise.Client) *cobra.Comman
 		outdated.PacmanSource(pacman.New(r)),
 		outdated.SkillsSource(skills.New(r)),
 		outdated.CargoSource(cargo.New(r)),
+		// Last: the tools the setup itself stands on, which no manager above
+		// reports (ADR-0027).
+		outdated.ToolchainSource(toolchain.New(r)),
 	}
 	root := &cobra.Command{
 		Use:   "myplace",

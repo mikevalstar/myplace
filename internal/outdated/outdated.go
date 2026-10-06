@@ -20,6 +20,7 @@ import (
 	"github.com/mikevalstar/myplace/internal/pacman"
 	"github.com/mikevalstar/myplace/internal/shelly"
 	"github.com/mikevalstar/myplace/internal/skills"
+	"github.com/mikevalstar/myplace/internal/toolchain"
 )
 
 // Schema is bumped only on breaking changes to the JSON shape (mirrors
@@ -62,6 +63,12 @@ type Inventory struct {
 // Collect queries every source in order, degrading gracefully: an unavailable
 // source is recorded with no packages; a failing source captures its error and
 // never aborts the others. The overall verdict is computed by ExitCode.
+//
+// A source may report packages *and* an error together — a partial result. The
+// toolchain source does this when some members compared fine and another's
+// upstream lookup failed (ADR-0027). Both fields are recorded: dropping the rows
+// would hide real staleness, and dropping the error would make a partial answer
+// look complete, which is the exact failure mode that motivated that ADR.
 func Collect(ctx context.Context, sources ...Source) Inventory {
 	inv := Inventory{Schema: Schema, CheckedAt: time.Now().UTC(), Sources: []SourceResult{}}
 	if h, err := os.Hostname(); err == nil {
@@ -74,9 +81,11 @@ func Collect(ctx context.Context, sources ...Source) Inventory {
 			continue
 		}
 		res.Available = true
-		if pkgs, err := s.Outdated(ctx); err != nil {
+		pkgs, err := s.Outdated(ctx)
+		if err != nil {
 			res.Error = err.Error()
-		} else {
+		}
+		if pkgs != nil {
 			res.Packages = pkgs
 		}
 		inv.Sources = append(inv.Sources, res)
@@ -92,15 +101,23 @@ func Collect(ctx context.Context, sources ...Source) Inventory {
 //
 // There is no 2/unknown: a partial failure where at least one source still
 // produced a result resolves to 0/1, with the failure captured per-source.
+//
+// A source that reports packages alongside an error counts as usable for those
+// packages: it found real staleness, and an unrelated member's lookup failing is
+// no reason to under-report it. A source that errored with nothing to show is
+// not usable — same as before.
 func ExitCode(inv Inventory) int {
 	anyOutdated, anyUsable := false, false
 	for _, s := range inv.Sources {
-		if !s.Available || s.Error != "" {
+		if !s.Available {
 			continue
 		}
-		anyUsable = true
 		if len(s.Packages) > 0 {
-			anyOutdated = true
+			anyUsable, anyOutdated = true, true
+			continue
+		}
+		if s.Error == "" {
+			anyUsable = true
 		}
 	}
 	switch {
@@ -181,7 +198,7 @@ func (s shellySource) Outdated(ctx context.Context) ([]Package, error) {
 type pacmanSource struct{ c *pacman.Client }
 
 // PacmanSource adapts a pacman client (Arch-family boxes: Omarchy, plain Arch —
-// ADR-0026). Present-if-installed like brew/shelly: Available() is true only
+// ADR-0027). Present-if-installed like brew/shelly: Available() is true only
 // where `checkupdates` (pacman-contrib) is on PATH. Reports the sync-repo
 // updates plus, when yay is installed, AUR updates prefixed `aur:`. Read-only:
 // checkupdates only refreshes a temporary database copy, and `pacman -Syu` is
@@ -242,6 +259,38 @@ func CargoSource(c *cargo.Client) Source { return cargoSource{c} }
 func (s cargoSource) Name() string                       { return "cargo" }
 func (s cargoSource) Available(ctx context.Context) bool { return s.c.Installed(ctx) }
 func (s cargoSource) Outdated(ctx context.Context) ([]Package, error) {
+	p, err := s.c.Outdated(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pkgs := make([]Package, 0, len(p))
+	for _, e := range p {
+		pkgs = append(pkgs, Package{Name: e.Name, Current: e.Current, Latest: e.Latest})
+	}
+	return pkgs, nil
+}
+
+type toolchainSource struct{ c *toolchain.Client }
+
+// ToolchainSource adapts a toolchain client: the core tools the setup itself
+// stands on — mise, chezmoi, rustup + Rust stable, Go, fnm — which no other
+// source here covers, because none of them is managed by a package manager
+// (ADR-0027). `mise outdated` reports what mise *manages*, not mise; the cargo
+// source covers `cargo install`ed binaries, not rustup or Rust itself.
+//
+// Available on any myplace-managed machine (mise and chezmoi are always there);
+// individual members are omitted rather than errored when absent, so a server
+// with no Rust yields no rustup/rust rows. Like cargo it needs the NETWORK
+// (three GitHub lookups plus go.dev, run concurrently), and like cargo an
+// offline machine lands in this source's Error and leaves the others intact.
+//
+// Read-only, as everything here is: it never runs `mise self-update`, `rustup
+// update`, or `chezmoi upgrade`.
+func ToolchainSource(c *toolchain.Client) Source { return toolchainSource{c} }
+
+func (s toolchainSource) Name() string                       { return "toolchain" }
+func (s toolchainSource) Available(ctx context.Context) bool { return s.c.Installed(ctx) }
+func (s toolchainSource) Outdated(ctx context.Context) ([]Package, error) {
 	p, err := s.c.Outdated(ctx)
 	if err != nil {
 		return nil, err

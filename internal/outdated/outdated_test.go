@@ -91,3 +91,35 @@ func TestExitCode(t *testing.T) {
 		})
 	}
 }
+
+func TestCollectKeepsPartialResultsAndTheError(t *testing.T) {
+	// A source may report rows *and* a failure (the toolchain source does when
+	// one member's upstream lookup fails while others compared fine, ADR-0027).
+	// Dropping either half is a bug: the rows are real staleness, and without the
+	// error a partial answer looks complete.
+	inv := Collect(context.Background(), fakeSource{
+		name:      "toolchain",
+		available: true,
+		pkgs:      []Package{{Name: "chezmoi", Current: "2.70.5", Latest: "2.72.1"}},
+		err:       errors.New("go: lookup failed"),
+	})
+	s := inv.Sources[0]
+	if len(s.Packages) != 1 {
+		t.Errorf("partial rows must survive, got %+v", s.Packages)
+	}
+	if s.Error == "" {
+		t.Error("the failure must survive alongside the rows")
+	}
+	// The rows are real, so the command still reports "updates available".
+	if got := ExitCode(inv); got != 1 {
+		t.Errorf("ExitCode = %d, want 1 (a partial source's real rows still count)", got)
+	}
+}
+
+func TestExitCodeErroredWithNoPackagesIsNotUsable(t *testing.T) {
+	// Unchanged from before: an error with nothing to show is not a result.
+	inv := Collect(context.Background(), fakeSource{name: "toolchain", available: true, err: errors.New("offline")})
+	if got := ExitCode(inv); got != 3 {
+		t.Errorf("ExitCode = %d, want 3 (no source produced a result)", got)
+	}
+}

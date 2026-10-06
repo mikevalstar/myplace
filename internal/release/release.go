@@ -61,21 +61,32 @@ func ParseLatestTag(body []byte) (string, error) {
 }
 
 // Latest queries the GitHub API for the newest release's metadata (tag, notes,
-// publish date).
-func Latest(ctx context.Context) (Release, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", Repo)
+// publish date) for myplace itself.
+func Latest(ctx context.Context) (Release, error) { return LatestIn(ctx, Repo) }
+
+// LatestIn is Latest for any "owner/name" repo. The toolchain currency check
+// (ADR-0027) uses it to look up mise, chezmoi, and fnm; myplace's own lookup is
+// just the Repo case.
+func LatestIn(ctx context.Context, repo string) (Release, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return Release{}, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
+	// Unauthenticated GitHub allows 60 requests/hour per IP, and ADR-0027 adds
+	// three lookups per run on top of this one. A token when the environment
+	// already has one lifts that to 5000 without making auth a requirement.
+	if tok := githubToken(); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return Release{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return Release{}, fmt.Errorf("releases/latest: HTTP %d", resp.StatusCode)
+		return Release{}, fmt.Errorf("%s releases/latest: HTTP %d", repo, resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
@@ -84,9 +95,23 @@ func Latest(ctx context.Context) (Release, error) {
 	return ParseLatest(body)
 }
 
-// LatestTag queries the GitHub API for the newest release tag (e.g. "v0.1.0").
-func LatestTag(ctx context.Context) (string, error) {
-	rel, err := Latest(ctx)
+// githubToken returns a token from the environment, if the user has one set for
+// their own gh/CI use. Never required, never prompted for, never stored.
+func githubToken() string {
+	for _, k := range []string{"GH_TOKEN", "GITHUB_TOKEN"} {
+		if v := strings.TrimSpace(os.Getenv(k)); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// LatestTag queries the GitHub API for myplace's newest release tag (e.g. "v0.1.0").
+func LatestTag(ctx context.Context) (string, error) { return LatestTagIn(ctx, Repo) }
+
+// LatestTagIn is LatestTag for any "owner/name" repo.
+func LatestTagIn(ctx context.Context, repo string) (string, error) {
+	rel, err := LatestIn(ctx, repo)
 	if err != nil {
 		return "", err
 	}
