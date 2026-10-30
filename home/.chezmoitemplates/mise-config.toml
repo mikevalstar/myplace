@@ -38,7 +38,10 @@ jj = "latest"
 herdr = "latest"
 {{ end -}}
 lazygit = "latest"
-fastfetch = "latest"
+# fastfetch pinned: 2.70.0 changed its macOS archive layout and mise's aqua
+# registry still points at the old bin path, so the install has no executable
+# (breaks `myplace sysinfo`). Back to "latest" once the registry catches up.
+fastfetch = "2.69.0"
 d2 = "latest"
 git-lfs = "latest"
 miller = "latest"
@@ -70,7 +73,10 @@ btop = "latest"
 {{ end -}}
 {{ if ne .profile "server" -}}
 # Interactive analytics database for desktop development and data inspection.
-duckdb = "latest"
+# duckdb pinned: 2.0.0 switched release assets from .zip to .tar.gz and mise's
+# aqua registry still expects .zip, so the upgrade fails. Back to "latest" once
+# the registry catches up.
+duckdb = "1.5.6"
 {{ end -}}
 
 [settings]
