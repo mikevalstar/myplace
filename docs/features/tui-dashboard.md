@@ -2,7 +2,7 @@
 title: TUI dashboard layout
 status: accepted
 created: 2026-06-12
-updated: 2026-07-03
+updated: 2026-10-31
 tags: [tui, bubbletea, lipgloss, layout, navigation, catppuccin]
 phase: 1
 ---
@@ -106,7 +106,7 @@ A passive, three-line band sits between the header and the panes (fixed height, 
 
 ### Activity view (`a`)
 
-`a` expands the Activity pane into a full-screen browser of `myplace.log` ([Logging](logging.md)): a much larger tail window than the pane's (about the last 1 MB — the whole file, in practice, given ~5 MB rotation), in a scrollable viewport with `/` case-insensitive substring filtering (matches a level like `ERRO`, a tool name, a pid, …). **Follow** is on by default: the 1-second activity tick re-reads the tail and keeps the view pinned to the newest lines; `f` toggles it off for free scrolling (the content still refreshes; the scroll position holds). `esc`/`q` returns. Like the pane, the tick only re-reads the file — never a status recompute or network call.
+`a` expands the Activity pane into a full-screen browser of `myplace.log` ([Logging](logging.md)): a much larger tail window than the pane's (about the last 1 MB — the whole file, in practice, given ~5 MB rotation), in a scrollable viewport with `/` case-insensitive substring filtering (matches a level like `ERROR`, a tool name, a pid, …). **Follow** is on by default: the 1-second activity tick re-reads the tail and keeps the view pinned to the newest lines; `f` toggles it off for free scrolling (the content still refreshes; the scroll position holds). `esc`/`q` returns. Like the pane, the tick only re-reads the file — never a status recompute or network call.
 
 ### States
 
