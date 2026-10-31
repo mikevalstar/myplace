@@ -400,7 +400,10 @@ func segment(parts []string, i int) int {
 // symlink is resolved first: brew puts a link in <prefix>/bin pointing into
 // <prefix>/Cellar, and on an Intel Mac that link lives in the very generic
 // /usr/local/bin — the Cellar path is what actually identifies it.
-func brewOwned(name string) bool {
+//
+// A var so tests can stub it: it reads the real PATH, so without the stub a
+// fake runner's "mise" is silently skipped on any Mac with Homebrew's mise.
+var brewOwned = func(name string) bool {
 	p, err := exec.LookPath(name)
 	if err != nil {
 		return false

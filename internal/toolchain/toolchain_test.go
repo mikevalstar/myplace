@@ -3,9 +3,17 @@ package toolchain
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 )
+
+// TestMain keeps the suite hermetic: brewOwned consults the host's real PATH,
+// which would otherwise make results depend on how this machine installed mise.
+func TestMain(m *testing.M) {
+	brewOwned = func(string) bool { return false }
+	os.Exit(m.Run())
+}
 
 // fakeRunner answers by binary name and records every command it was asked to
 // run, so a test can assert this package never issues a mutating one.
