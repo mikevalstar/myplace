@@ -4,7 +4,7 @@ status: accepted
 created: 2026-07-02
 updated: 2026-07-02
 tags: [herdr, provisioning, terminal, plugins, chezmoi]
-supersedes: ADR-0018
+supersedes: "0018"
 superseded-by: null
 ---
 

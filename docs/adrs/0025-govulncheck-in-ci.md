@@ -1,11 +1,11 @@
 ---
 title: ADR-0025 — govulncheck in CI
-status: accepted
+status: superseded
 created: 2026-07-25
-updated: 2026-07-25
+updated: 2026-10-31
 tags: [ci, security, go, tooling]
 supersedes: null
-superseded-by: null
+superseded-by: "0028"
 ---
 
 # ADR-0025: govulncheck in CI
