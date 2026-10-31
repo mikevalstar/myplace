@@ -1,12 +1,13 @@
 package tui
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"fmt"
 	"sort"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/mikevalstar/myplace/internal/doctor"
@@ -185,7 +186,7 @@ func (m Model) renderPane(header string, rows []paneRow, w, h int, focused bool,
 	}
 	body := m.windowRows(rows, innerH-1, focused, sel, contentW)
 	lines := append([]string{header}, body...)
-	return style.Width(w - 2).Height(innerH).Render(strings.Join(lines, "\n"))
+	return style.Width(w).Height(h).Render(strings.Join(lines, "\n"))
 }
 
 // cardHeader lays out a card title: an accent bar + accent-colored title on the
@@ -302,7 +303,7 @@ func (m Model) renderActivity(w, h int) string {
 	for _, r := range rows {
 		lines = append(lines, r.style.Render(truncate(r.text, contentW)))
 	}
-	return th.PaneStyle.Width(w - 2).Height(innerH).Render(strings.Join(lines, "\n"))
+	return th.PaneStyle.Width(w).Height(h).Render(strings.Join(lines, "\n"))
 }
 
 // activityRows puts notices (update available, errors) first, then the log tail.
@@ -351,7 +352,7 @@ func (m Model) detailTitle() string {
 
 func (m Model) renderDiff(diff string) string {
 	th := m.theme
-	cw := m.detailVP.Width
+	cw := m.detailVP.Width()
 	if cw <= 0 {
 		cw = m.width
 	}
@@ -374,7 +375,7 @@ func (m Model) renderDiff(diff string) string {
 }
 
 func (m Model) renderDetailBody(it selectable) string {
-	cw := m.detailVP.Width
+	cw := m.detailVP.Width()
 	if cw <= 0 {
 		cw = m.width
 	}
@@ -390,7 +391,7 @@ func (m Model) renderDetailBody(it selectable) string {
 // GitHub fetch lands (loading/error states render in place; nothing blocks).
 func (m Model) renderReleaseDetail() string {
 	th := m.theme
-	cw := m.detailVP.Width
+	cw := m.detailVP.Width()
 	if cw <= 0 {
 		cw = m.width
 	}
@@ -445,7 +446,7 @@ func (m Model) renderDetailPanel(w, h int) string {
 	}
 	title := cardHeader(th.AccentDetail, m.detailTitle(), "", contentW)
 	content := title + "\n" + m.detailVP.View()
-	return th.PaneStyle.Width(w - 2).Height(innerH).Render(content)
+	return th.PaneStyle.Width(w).Height(h).Render(content)
 }
 
 // --- header / footer ------------------------------------------------------
@@ -469,7 +470,7 @@ func (m Model) footer(width int) string {
 	th := m.theme
 	fh := m.help
 	fh.ShowAll = false
-	fh.Width = width
+	fh.SetWidth(width)
 	left := fh.View(m.keys)
 	// Always show the running version on the right; when a newer release is
 	// out, the same slot shows the upgrade in the notice color.
@@ -486,7 +487,15 @@ func (m Model) footer(width int) string {
 
 // --- top-level views ------------------------------------------------------
 
-func (m Model) View() string {
+// View wraps render in a tea.View: Bubble Tea v2 declares the alt screen per
+// frame instead of taking it as a program option.
+func (m Model) View() tea.View {
+	v := tea.NewView(m.render())
+	v.AltScreen = true
+	return v
+}
+
+func (m Model) render() string {
 	w, h := m.width, m.height
 	if w == 0 || h == 0 {
 		return "  starting…"
@@ -586,7 +595,7 @@ func (m Model) progressBlock(innerW int) string {
 		done = 3
 	}
 	p := m.progress
-	p.Width = innerW
+	p.SetWidth(innerW)
 	lines = append(lines, "", p.ViewAs(float64(done)/3.0))
 	if len(m.updateErrs) > 0 {
 		lines = append(lines, "", th.Err.Render(truncate(fmt.Sprintf("! %d step(s) had problems — see Activity", len(m.updateErrs)), innerW)))
@@ -620,48 +629,22 @@ func (m Model) dim(s string) string {
 	return b.String()
 }
 
-// overlayCenter places fg centered over bg, ANSI-aware, returning H lines of
-// width W. The fg box is opaque — its lines replace the bg columns they cover.
+// overlayCenter places fg centered over bg with Lip Gloss's compositor. The fg
+// box is opaque: its cells replace the bg cells they cover.
 func overlayCenter(bg, fg string, W, H int) string {
-	bgLines := strings.Split(bg, "\n")
-	fgLines := strings.Split(strings.TrimRight(fg, "\n"), "\n")
-	boxW := 0
-	for _, l := range fgLines {
-		if w := ansi.StringWidth(l); w > boxW {
-			boxW = w
-		}
-	}
-	x := (W - boxW) / 2
-	if x < 0 {
-		x = 0
-	}
-	y := (H - len(fgLines)) / 2
-	if y < 0 {
-		y = 0
-	}
-	for i, fl := range fgLines {
-		row := y + i
-		if row < 0 || row >= len(bgLines) {
-			continue
-		}
-		if pad := boxW - ansi.StringWidth(fl); pad > 0 {
-			fl += strings.Repeat(" ", pad)
-		}
-		left := ansi.Truncate(bgLines[row], x, "")
-		if w := ansi.StringWidth(left); w < x {
-			left += strings.Repeat(" ", x-w)
-		}
-		right := ansi.TruncateLeft(bgLines[row], x+boxW, "")
-		bgLines[row] = left + fl + right
-	}
-	return strings.Join(bgLines, "\n")
+	x := max(0, (W-lipgloss.Width(fg))/2)
+	y := max(0, (H-lipgloss.Height(fg))/2)
+	return lipgloss.NewCompositor(
+		lipgloss.NewLayer(bg),
+		lipgloss.NewLayer(fg).X(x).Y(y).Z(1),
+	).Render()
 }
 
 func (m Model) helpView() string {
 	th := m.theme
 	hp := m.help
 	hp.ShowAll = true
-	hp.Width = m.width
+	hp.SetWidth(m.width)
 	box := th.PaneStyle.Padding(1, 2).Render(th.PaneTitle.Render("myplace — keys") + "\n\n" + hp.View(m.keys))
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
@@ -781,7 +764,7 @@ func (m Model) outdatedContent() string {
 	if m.invLoading || m.inventory == nil {
 		return th.Subtle.Render("checking…")
 	}
-	cw := m.vp.Width
+	cw := m.vp.Width()
 	if cw <= 0 {
 		cw = m.width
 	}
@@ -881,7 +864,7 @@ func (m Model) doctorContent() string {
 	if m.doctorRep == nil {
 		return th.Subtle.Render("press r to run the checks")
 	}
-	cw := m.vp.Width
+	cw := m.vp.Width()
 	if cw <= 0 {
 		cw = m.width
 	}
@@ -961,7 +944,7 @@ func (m Model) activityView() string {
 // lines emphasized.
 func (m Model) activityContent() string {
 	th := m.theme
-	cw := m.vp.Width
+	cw := m.vp.Width()
 	if cw <= 0 {
 		cw = m.width
 	}

@@ -14,13 +14,13 @@
 package tui
 
 import (
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/progress"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/progress"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/mikevalstar/myplace/internal/chezmoi"
 	"github.com/mikevalstar/myplace/internal/doctor"
@@ -250,6 +250,6 @@ func (m Model) Init() tea.Cmd {
 // view needs (the user's real PATH); the cmd layer resolves them, as it does
 // for the doctor CLI command.
 func Run(ch *chezmoi.Client, ms *mise.Client, si *sysinfo.Client, sources []outdated.Source, version string, docOpts doctor.Options) error {
-	_, err := tea.NewProgram(New(ch, ms, si, sources, version, docOpts), tea.WithAltScreen()).Run()
+	_, err := tea.NewProgram(New(ch, ms, si, sources, version, docOpts)).Run()
 	return err
 }

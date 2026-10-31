@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/mikevalstar/myplace/internal/doctor"
 	"github.com/mikevalstar/myplace/internal/drift"
@@ -137,9 +137,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.help.Width = m.width
+		m.help.SetWidth(m.width)
 		if m.mode == modeOutdated || m.mode == modeDoctor || m.mode == modeActivity {
-			m.vp.Width, m.vp.Height = m.width, m.height-3
+			m.vp.SetWidth(m.width)
+			m.vp.SetHeight(m.height - 3)
 			m.setViewBody()
 		}
 		m.sizeDetail()
@@ -218,7 +219,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case stepDoneMsg:
 		return m.advanceUpdate(msg)
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
 
@@ -270,7 +271,7 @@ func stepLabel(s updateStep) string {
 
 // --- key handling ---------------------------------------------------------
 
-func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// ctrl+c always quits, even mid-filter.
 	if msg.String() == "ctrl+c" {
 		return m, tea.Quit
@@ -314,19 +315,19 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m Model) updateDashboard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateDashboard(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
 	case key.Matches(msg, m.keys.Outdated):
 		m.mode = modeOutdated
 		m.filter.SetValue("")
-		m.vp = viewport.New(m.width, m.height-3)
+		m.vp = viewport.New(viewport.WithWidth(m.width), viewport.WithHeight(m.height-3))
 		m.vp.SetContent(m.outdatedContent())
 		return m, nil
 	case key.Matches(msg, m.keys.Doctor):
 		m.mode = modeDoctor
-		m.vp = viewport.New(m.width, m.height-3)
+		m.vp = viewport.New(viewport.WithWidth(m.width), viewport.WithHeight(m.height-3))
 		cmd := m.startDoctor(false)
 		m.vp.SetContent(m.doctorContent())
 		return m, cmd
@@ -335,7 +336,7 @@ func (m Model) updateDashboard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.follow = true
 		m.filter.SetValue("")
 		m.actLines = logging.TailLines(activityTailLines, activityTailWindow)
-		m.vp = viewport.New(m.width, m.height-3)
+		m.vp = viewport.New(viewport.WithWidth(m.width), viewport.WithHeight(m.height-3))
 		m.vp.SetContent(m.activityContent())
 		m.vp.GotoBottom()
 		return m, nil
@@ -387,7 +388,7 @@ func (m Model) updateDashboard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) updateDetailMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateDetailMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Esc) || key.Matches(msg, m.keys.Quit):
 		m.mode = modeDashboard
@@ -399,7 +400,7 @@ func (m Model) updateDetailMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) updateOutdated(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateOutdated(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.filtering {
 		switch {
 		case key.Matches(msg, m.keys.Esc):
@@ -451,7 +452,7 @@ func (m *Model) startDoctor(rerun bool) tea.Cmd {
 	return tea.Batch(m.spinner.Tick, m.doctorCmd())
 }
 
-func (m Model) updateDoctor(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateDoctor(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Esc), key.Matches(msg, m.keys.Quit):
 		m.mode = modeDashboard
@@ -466,7 +467,7 @@ func (m Model) updateDoctor(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) updateActivity(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateActivity(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.filtering {
 		switch {
 		case key.Matches(msg, m.keys.Esc):
@@ -577,8 +578,8 @@ func (m *Model) sizeDetail() {
 	}
 	if m.mode == modeDetail || (m.mode == modeDashboard && !m.wide()) {
 		// full-screen (header + viewport + footer)
-		m.detailVP.Width = m.width
-		m.detailVP.Height = max1(m.height - 3)
+		m.detailVP.SetWidth(m.width)
+		m.detailVP.SetHeight(max1(m.height - 3))
 		return
 	}
 	// wide inline panel: right ~40%, inside a bordered box with a title row.
@@ -588,8 +589,8 @@ func (m *Model) sizeDetail() {
 	// the screen without overflowing.
 	leftW := m.width * 60 / 100
 	dw := m.width - leftW
-	m.detailVP.Width = max1(dw - 4)
-	m.detailVP.Height = max1((m.height - 3 - sysinfoBandLines) - 2 - 1)
+	m.detailVP.SetWidth(max1(dw - 4))
+	m.detailVP.SetHeight(max1((m.height - 3 - sysinfoBandLines) - 2 - 1))
 }
 
 // syncDetail rebuilds the detail viewport content from the focused selection.

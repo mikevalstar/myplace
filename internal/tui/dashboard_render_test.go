@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/mikevalstar/myplace/internal/doctor"
 	"github.com/mikevalstar/myplace/internal/drift"
@@ -84,7 +84,7 @@ func TestDashboardFillsHeight(t *testing.T) {
 		for _, h := range []int{20, 30, 50} {
 			m := sampleModel(w, h)
 			m.system = sampleSysinfo()
-			if got := strings.Count(m.View(), "\n") + 1; got != h {
+			if got := strings.Count(m.render(), "\n") + 1; got != h {
 				t.Errorf("w=%d h=%d: rendered %d rows, want %d (overflow clips the top)", w, h, got, h)
 			}
 		}
@@ -98,19 +98,19 @@ func TestRenderNoWrap(t *testing.T) {
 	// Tiny terminals fall back to the stacked smallView — it must still fit.
 	for _, wh := range [][2]int{{40, 12}, {50, 10}} {
 		m := sampleModel(wh[0], wh[1])
-		assertNoOverflow(t, "small", m.View(), wh[0])
+		assertNoOverflow(t, "small", m.render(), wh[0])
 	}
 	for _, w := range []int{60, 80, 100, 120, 160, 200, 240} {
 		for _, h := range []int{16, 30, 50} {
 			m := sampleModel(w, h)
-			assertNoOverflow(t, "dashboard", m.View(), w)
+			assertNoOverflow(t, "dashboard", m.render(), w)
 			// Focus each pane and select an item, to exercise the highlight.
 			for f := focus(0); f < focusCount; f++ {
 				fm := sampleModel(w, h)
 				fm.focus = f
 				fm.sel[f] = 1
 				fm.syncDetail()
-				assertNoOverflow(t, fmt.Sprintf("focus=%d", f), fm.View(), w)
+				assertNoOverflow(t, fmt.Sprintf("focus=%d", f), fm.render(), w)
 			}
 		}
 	}
@@ -125,7 +125,7 @@ func TestRenderDetailPanel(t *testing.T) {
 		m.sel[focusDotfiles] = 0
 		m.diffCache[".config/mise/config.toml"] = "--- a/.config/mise/config.toml\n+++ b/.config/mise/config.toml\n@@ -1,2 +1,2 @@\n-old = \"value\"\n+new = \"value\"\n"
 		m.syncDetail()
-		out := m.View()
+		out := m.render()
 		assertNoOverflow(t, "detail", out, w)
 		for _, want := range []string{"new = ", "old = ", "config.toml"} {
 			if !strings.Contains(out, want) {
@@ -140,7 +140,7 @@ func TestRenderHelpOverlay(t *testing.T) {
 	for _, w := range []int{80, 160} {
 		m := sampleModel(w, 40)
 		m.showHelp = true
-		out := m.View()
+		out := m.render()
 		assertNoOverflow(t, "help", out, w)
 		for _, want := range []string{"keys", "refresh", "update", "quit"} {
 			if !strings.Contains(out, want) {
@@ -159,7 +159,7 @@ func TestRenderUpdateProgress(t *testing.T) {
 			m := sampleModel(w, 30)
 			m.updating = true
 			m.updateStep = step
-			out := m.View()
+			out := m.render()
 			assertNoOverflow(t, "progress", out, w)
 			for _, want := range []string{"chezmoi apply", "mise install", "mise upgrade", "updating"} {
 				if !strings.Contains(out, want) {
@@ -176,7 +176,7 @@ func TestRenderUpdateProgress(t *testing.T) {
 		m := sampleModel(w, 30)
 		m.updating = true
 		m.updateStep = stepDone
-		out := m.View()
+		out := m.render()
 		assertNoOverflow(t, "progress-done", out, w)
 		if strings.Contains(out, "checking status") {
 			t.Errorf("w=%d reload phase flashed the loading screen instead of keeping the modal", w)
@@ -195,7 +195,7 @@ func TestRenderOutdatedView(t *testing.T) {
 		// default: grouped by source
 		m := sampleModel(w, h)
 		m.mode = modeOutdated
-		m.vp = viewport.New(w, h-3)
+		m.vp = viewport.New(viewport.WithWidth(w), viewport.WithHeight(h-3))
 		m.vp.SetContent(m.outdatedContent())
 		out := m.outdatedView()
 		assertNoOverflow(t, "outdated", out, w)
@@ -209,7 +209,7 @@ func TestRenderOutdatedView(t *testing.T) {
 		mn := sampleModel(w, h)
 		mn.mode = modeOutdated
 		mn.sort = sortByName
-		mn.vp = viewport.New(w, h-3)
+		mn.vp = viewport.New(viewport.WithWidth(w), viewport.WithHeight(h-3))
 		mn.vp.SetContent(mn.outdatedContent())
 		assertNoOverflow(t, "outdated-name", mn.outdatedView(), w)
 		if !strings.Contains(mn.outdatedContent(), "by name") {
@@ -220,7 +220,7 @@ func TestRenderOutdatedView(t *testing.T) {
 		mf := sampleModel(w, h)
 		mf.mode = modeOutdated
 		mf.filter.SetValue("git")
-		mf.vp = viewport.New(w, h-3)
+		mf.vp = viewport.New(viewport.WithWidth(w), viewport.WithHeight(h-3))
 		body := mf.outdatedContent()
 		assertNoOverflow(t, "outdated-filter", mf.outdatedView(), w)
 		if !strings.Contains(body, "git") {
@@ -260,7 +260,7 @@ func TestRenderDoctorView(t *testing.T) {
 		m := sampleModel(w, h)
 		m.mode = modeDoctor
 		m.doctorRep = sampleDoctorReport()
-		m.vp = viewport.New(w, h-3)
+		m.vp = viewport.New(viewport.WithWidth(w), viewport.WithHeight(h-3))
 		m.vp.SetContent(m.doctorContent())
 		out := m.doctorView()
 		assertNoOverflow(t, "doctor", out, w)
@@ -275,7 +275,7 @@ func TestRenderDoctorView(t *testing.T) {
 	m := sampleModel(100, 30)
 	m.mode = modeDoctor
 	m.doctorLoading = true
-	m.vp = viewport.New(100, 27)
+	m.vp = viewport.New(viewport.WithWidth(100), viewport.WithHeight(27))
 	out := m.doctorView()
 	assertNoOverflow(t, "doctor-loading", out, 100)
 	if !strings.Contains(out, "running doctor checks") {
@@ -296,7 +296,7 @@ func TestRenderActivityView(t *testing.T) {
 			`2026-07-03T10:00:01-04:00 ERRO exec failed cmd=tui tool=mise err="exit 1"`,
 			`2026-07-03T10:00:02-04:00 INFO status cmd=tui verdict=drifted`,
 		}
-		m.vp = viewport.New(w, h-3)
+		m.vp = viewport.New(viewport.WithWidth(w), viewport.WithHeight(h-3))
 		m.vp.SetContent(m.activityContent())
 		out := m.activityView()
 		assertNoOverflow(t, "activity", out, w)
@@ -351,7 +351,7 @@ func TestUpdatesPaneBinaryRow(t *testing.T) {
 	if cmd := m.syncDetail(); cmd != nil {
 		t.Error("warm release cache should not trigger a fetch")
 	}
-	out := m.View()
+	out := m.render()
 	assertNoOverflow(t, "release-detail", out, 160)
 	for _, want := range []string{"current: v0.1.0", "latest:  v0.2.0", "myplace self-update", "doctor view in the TUI"} {
 		if !strings.Contains(out, want) {
@@ -366,7 +366,7 @@ func TestUpdatesPaneBinaryRow(t *testing.T) {
 	if cmd := mc.syncDetail(); cmd == nil {
 		t.Error("cold release cache should trigger the lazy fetch")
 	}
-	if !strings.Contains(mc.View(), "loading release notes") {
+	if !strings.Contains(mc.render(), "loading release notes") {
 		t.Error("cold release detail should show the loading line")
 	}
 	if cmd := mc.syncDetail(); cmd != nil {
@@ -383,7 +383,7 @@ func TestDoctorActivityNavigation(t *testing.T) {
 	if m.mode != modeDoctor || !m.doctorLoading {
 		t.Fatalf("expected modeDoctor with checks in flight, got mode=%d loading=%v", m.mode, m.doctorLoading)
 	}
-	m = step(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	if m.mode != modeDashboard {
 		t.Fatalf("expected modeDashboard after esc, got %d", m.mode)
 	}
@@ -396,10 +396,10 @@ func TestDoctorActivityNavigation(t *testing.T) {
 	if cmd != nil {
 		t.Error("cached doctor report should not re-run on re-entry")
 	}
-	if !strings.Contains(m.View(), "problems found") {
+	if !strings.Contains(m.render(), "problems found") {
 		t.Error("doctor view should render the cached report")
 	}
-	m = step(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 
 	// the not-ready verdict now surfaces as an Activity-pane notice
 	noticed := false
@@ -438,19 +438,19 @@ func TestNavigation(t *testing.T) {
 	}
 
 	// tab moves focus to Tools
-	m = step(m, tea.KeyMsg{Type: tea.KeyTab})
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyTab})
 	if m.focus != focusTools {
 		t.Fatalf("expected focus Tools, got %d", m.focus)
 	}
 
 	// enter opens the full-screen detail (narrow terminal)
-	m = step(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.mode != modeDetail {
 		t.Fatalf("expected modeDetail after enter, got %d", m.mode)
 	}
 
 	// esc returns to the dashboard
-	m = step(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	if m.mode != modeDashboard {
 		t.Fatalf("expected modeDashboard after esc, got %d", m.mode)
 	}
@@ -467,23 +467,23 @@ func step(m Model, msg tea.Msg) Model {
 	return next.(Model)
 }
 
-func keyMsg(s string) tea.KeyMsg {
-	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
+func keyMsg(s string) tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: []rune(s)[0], Text: s}
 }
 
 func TestRenderSnapshot(t *testing.T) {
 	if testing.Verbose() {
-		fmt.Println(sampleModel(160, 44).View())
+		fmt.Println(sampleModel(160, 44).render())
 		m := sampleModel(100, 28)
 		m.mode = modeOutdated
-		m.vp = viewport.New(100, 25)
+		m.vp = viewport.New(viewport.WithWidth(100), viewport.WithHeight(25))
 		m.vp.SetContent(m.outdatedContent())
 		fmt.Println(m.outdatedView())
 
 		d := sampleModel(100, 28)
 		d.mode = modeDoctor
 		d.doctorRep = sampleDoctorReport()
-		d.vp = viewport.New(100, 25)
+		d.vp = viewport.New(viewport.WithWidth(100), viewport.WithHeight(25))
 		d.vp.SetContent(d.doctorContent())
 		fmt.Println(d.doctorView())
 
@@ -491,7 +491,7 @@ func TestRenderSnapshot(t *testing.T) {
 		a.mode = modeActivity
 		a.follow = true
 		a.actLines = a.activity
-		a.vp = viewport.New(100, 25)
+		a.vp = viewport.New(viewport.WithWidth(100), viewport.WithHeight(25))
 		a.vp.SetContent(a.activityContent())
 		fmt.Println(a.activityView())
 	}

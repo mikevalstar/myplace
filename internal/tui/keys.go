@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/charmbracelet/bubbles/key"
+import "charm.land/bubbles/v2/key"
 
 // keyMap is the dashboard's full binding set. Defining bindings once here (and
 // implementing help.KeyMap) keeps the footer hints and the `?` overlay in sync

@@ -1,8 +1,11 @@
 package tui
 
 import (
+	"image/color"
+	"os"
+
+	"charm.land/lipgloss/v2"
 	catppuccin "github.com/catppuccin/go"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // Theme is the dashboard's palette, keyed by semantic ROLE rather than by
@@ -47,7 +50,7 @@ var paneBorder = lipgloss.RoundedBorder()
 // NewTheme maps a Catppuccin flavor onto the semantic roles. This is the one
 // place the palette is consulted.
 func NewTheme(f catppuccin.Flavor) Theme {
-	c := func(col catppuccin.Color) lipgloss.Color { return lipgloss.Color(col.Hex) }
+	c := func(col catppuccin.Color) color.Color { return lipgloss.Color(col.Hex) }
 
 	pane := lipgloss.NewStyle().Border(paneBorder).Padding(0, 1)
 	badge := func(bg catppuccin.Color) lipgloss.Style {
@@ -96,7 +99,7 @@ func NewTheme(f catppuccin.Flavor) Theme {
 // model construction — HasDarkBackground() probes the terminal and shouldn't
 // run per frame (see docs/guides/charm-tui-stack.md).
 func DefaultTheme() Theme {
-	if lipgloss.HasDarkBackground() {
+	if lipgloss.HasDarkBackground(os.Stdin, os.Stdout) {
 		return NewTheme(catppuccin.Mocha)
 	}
 	return NewTheme(catppuccin.Latte)

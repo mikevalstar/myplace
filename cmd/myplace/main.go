@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	charmlog "github.com/charmbracelet/log"
+	charmlog "charm.land/log/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/mikevalstar/myplace/internal/brew"
