@@ -137,6 +137,12 @@ alias lvim="NVIM_APPNAME=LazyVim nvim"
 alias cdd="cd_to_dir"
 alias bj="bjourn"
 
+# photoup: upload ~/Documents/camera to Immich, stacking RAW+JPEG pairs (JPEG as
+# cover) and bursts. Re-runs skip what's already uploaded. Server + key are
+# machine-local in ~/.zshenv (IMMICH_SERVER, IMMICH_KEY) — never in this repo.
+# Extra args pass through: `photoup --dry-run`.
+alias photoup='immich-go upload from-folder --server="${IMMICH_SERVER:?set IMMICH_SERVER in ~/.zshenv}" --api-key="${IMMICH_KEY:?set IMMICH_KEY in ~/.zshenv}" --manage-raw-jpeg=StackCoverJPG --manage-burst=Stack ~/Documents/camera'
+
 # eza — a nicer ls. The config dir is harmless everywhere, but the aliases that
 # shadow `ls`/`ll`/`la` add icons/colors/git columns that break coding agents
 # parsing ls output, so gate them on MYPLACE_INTERACTIVE_SHELL (set in .zshrc).
