@@ -31,12 +31,13 @@ On a new machine, `install.sh` installs the `myplace` binary into `~/.local/bin`
 |---|---|
 | Search and navigation | `ripgrep`, `fd`, `fzf`, `zoxide`, `eza` |
 | Data and text | `jq`, `yq`, `miller`, `sd`, `fx`, `bat`, `glow`, `tlrc` (`tldr`), `okq` |
+| Media | `immich-go` |
 | Shell and prompts | `starship`, `atuin`, `gum` |
 | Git and change review | `gh`, `delta`, `hunk`, `jj`, `lazygit`, `git-lfs`, `actionlint` |
 | Development and automation | `pnpm`, `bun`, `d2`, `ast-grep`, `hyperfine` |
 | System and terminal | `herdr`, `fastfetch` |
 
-Linux also gets `btop` from mise. macOS gets `btop` through Homebrew when Homebrew is available. Desktop profiles also get `duckdb`; servers omit it. Omarchy omits `herdr` from mise (the distro packages it and a shipped migration removes any mise copy); the managed herdr config and plugins still apply there. `okq` is not in mise's registry and is installed from its GitHub releases through mise's `github:` backend. `fastfetch` (2.69.0) and `duckdb` (1.5.6) are temporarily pinned because mise's aqua registry doesn't match their newest release assets yet.
+Linux also gets `btop` from mise. macOS gets `btop` through Homebrew when Homebrew is available. Desktop profiles also get `duckdb`; servers omit it. Omarchy omits `herdr` from mise (the distro packages it and a shipped migration removes any mise copy); the managed herdr config and plugins still apply there. `okq` and `immich-go` are not in mise's registry and are installed from their GitHub releases through mise's `github:` backend. `fastfetch` (2.69.0) and `duckdb` (1.5.6) are temporarily pinned because mise's aqua registry doesn't match their newest release assets yet.
 
 ### Managed outside mise
 

@@ -66,6 +66,9 @@ bun = "latest"
 # repo's docs/). Not in mise's registry — pulled straight from its GitHub
 # releases, which cover darwin/linux × amd64/arm64.
 "github:mikevalstar/okq" = "latest"
+# immich-go: bulk uploader/archiver for the Immich photo server. Not in mise's
+# registry — pulled from its GitHub releases (darwin/linux × amd64/arm64).
+"github:simulot/immich-go" = "latest"
 {{ if eq .chezmoi.os "linux" -}}
 # btop's only mise backend (aqua) ships linux binaries only; macOS gets it via
 # brew in run_onchange_provision.sh (ADR-0008).
