@@ -6,14 +6,14 @@ require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.1
 	charm.land/huh/v2 v2.0.3
-	charm.land/lipgloss/v2 v2.0.6
+	charm.land/lipgloss/v2 v2.1.1
 	charm.land/log/v2 v2.0.1
 	github.com/catppuccin/go v0.3.0
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/dustin/go-humanize v1.1.0
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
-	golang.org/x/term v0.47.0
+	github.com/spf13/pflag v1.1.0
+	golang.org/x/term v0.48.0
 )
 
 require (
@@ -38,5 +38,5 @@ require (
 	github.com/xo/terminfo v1.0.0 // indirect
 	golang.org/x/exp v0.0.0-20260718201538-764159d718ef // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 )
